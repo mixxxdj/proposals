@@ -42,7 +42,7 @@ The process of proposing a change via a design document is the following:
 
 1. Fork `github.com/acolombier/mixxx-proposals`.
 2. Create a GitHub Pull Request with a design document in markdown format to the [proposals directory](./proposals).
-   Make sure to use the [template](0000-00-00_template.md) as the guide for what sections should be present in the
+   Make sure to use the [template](YYYY-MM-DD_template.md) as the guide for what sections should be present in the
    document. Put the creation date (the day you started preparing this design document) as the prefix and some unique
    name as the suffix in the file name. Once the PR is proposed, a maintainer will assign a `proposal` label.
 3. An automatic formatter is enabled in the repository. Use `pre-commit` locally to trigger the formatting of all
