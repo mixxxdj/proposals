@@ -22,6 +22,7 @@ repos:
     rev: v2.2.6
     hooks:
       - id: codespell
-        name: codespell
-        description: Checks for common misspellings in text files.
-        entry: codespell -w
+        args:
+          - --ignore-words
+          - .codespellignore
+          - --write-changes
