@@ -9,11 +9,11 @@
 
 * **Related Issues and PRs:**
 
-* [Issue 5655](https://github.com/mixxxdj/mixxx/issues/5655)
-* [Issue 7810](https://github.com/mixxxdj/mixxx/issues/7810)
-* [Issue 7599](https://github.com/mixxxdj/mixxx/issues/7599)
-* [Issue 9896](https://github.com/mixxxdj/mixxx/issues/9896)
-* [Issue 12753](https://github.com/mixxxdj/mixxx/issues/12753)
+  * [Issue 5655](https://github.com/mixxxdj/mixxx/issues/5655)
+  * [Issue 7810](https://github.com/mixxxdj/mixxx/issues/7810)
+  * [Issue 7599](https://github.com/mixxxdj/mixxx/issues/7599)
+  * [Issue 9896](https://github.com/mixxxdj/mixxx/issues/9896)
+  * [Issue 12753](https://github.com/mixxxdj/mixxx/issues/12753)
 
 * **Other docs or links:**
   * [GSoC Proposal](https://docs.google.com/document/d/1QAe8mvZFKkFnG--02kuzSagzea6_ed5g3VfjuSyAY7w/edit?usp=sharing)
