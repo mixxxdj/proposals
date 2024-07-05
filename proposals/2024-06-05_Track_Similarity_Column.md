@@ -52,12 +52,9 @@ Users interested in creating harmonic mixes.
 
 ### Finding the target track
 
-This is still an **Open Question**. Here's where we are at right now:
+In the initial version, Mixxx will use the Sync Leader as the target track.
 
-If the user does not explicitly select a target track, Mixxx may automatically select a deck, based on the
-algorithm for choosing the Sync Leader.
-
-We can provide context menu options to target other decks, or tracks from the library.
+Later, we can provide context menu options to target other decks, or tracks from the library.
 
 ### Computing Compatibility
 
