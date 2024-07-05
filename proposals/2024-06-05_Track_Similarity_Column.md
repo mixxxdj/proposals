@@ -126,32 +126,30 @@ def circle_of_fifths_distance(note):
 
 def compatibility(pitch_difference):
     rounded_pitch_diff = round(pitch_difference)
-    delta = abs(rounded_pitch_diff - pitch_difference)
+    cents = abs(rounded_pitch_diff - pitch_difference)
     # get a rank from 0 to 6, lower means more compatible
     cof_rank = circle_of_fifths_distance(rounded_pitch_diff)
-    return cof_rank, delta
+    return cof_rank, cents
 
 comp = compatibility(pd)
-print("Rank:", comp[0], "Delta:", comp[1]) # Rank: 0 Delta: 0.19895410624553378
+print("Rank:", comp[0], "Detune:", comp[1]) # Rank: 0 Detune: 0.19895410624553378
 ```
 
 This gives us a rank, where 0 means the tracks will be in the same key,
 and 6 means the tracks will sound most dissonant together.
 
-We also get a delta/detune value to find out how off tune the tracks will be in cents.
+We also get a detune value to find out how off tune the tracks will be in cents.
 
 TODO: The algorithm needs to be able to take in tuning information, for non 440Hz tuning standards.
 
 ### Displaying The Information
 
-A similarity column will show the rank.  The column will allow for sorting and ranking search results.
+A similarity column will be added, which will allow for sorting and ranking search results.
 The values may be encoded as colors taken from a fire, in the range of black to bright yellow.
+An option will be provided to display similarity as a percentage string, for accessibility.
 
-Detune value may be displayed in another column. It ranges from 0 to 0.5. Lower values mean more harmonious transitions.
-
-**Open Question**: It may be possible to combine the information of the detune column into the similarity column.
-Either by creating a formula that combines the two values,
-or by encoding it in some other way (like opacity, or another icon).
+The value will be calculated using the detune and rank. It will be a kind of sinus curve with a tip at
+a full match and at compatible keys and dips where the key is out of tunes at the 50 cents region at least.
 
 ## Alternatives
 
