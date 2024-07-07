@@ -157,7 +157,25 @@ read it. Tell them why you still think you should take this path.
 
 ## Action Plan
 
-The tasks to do in order to migrate to the new idea.
+Similarity formula
+- extract the library data from mixxxdb.sqlite, import it in python for easy prototyping
+- test what values of detune are acceptable, and how this relates to the rank
+- create a formula that models the relation of similarity with detune and rank
 
-* [ ] Task one <GH issue>
-* [ ] Task two <GH issue> ...
+Similarity Column UI
+- create a new column, and a delegate for it
+- get a freely licensed (eg. creative commons) Fire icon, and render it in the column
+- make the fire change color based on the output of similarity formula
+- add an option to keep the column blank (when there is no similarity value)
+
+Write simarity algorithm in KeyUtils. It should take in Key and BPM of two tracks,and return similarity based on formula created above.
+
+Target Track - Sync Leader
+- create an `updateTargetTrack` function that is called for these events:
+	- sync leader enabled / disabled
+	- user changed sync leader deck
+	- deck track changed
+	- deck pitch shifted using Rubberband
+- create a `targetTrack` value, that holds the Key and BPM, and is available to `updateTargetTrack` to modify, and to `BaseTrackTableModel::roleValue` where the similarity value will be computed for each track. It will need to be able to hold the info that no target track is available.
+
+In `BaseTrackTableModel::roleValue`, compute the similarity for the current track with the target track, and return this value to the delegate.
