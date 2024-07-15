@@ -238,8 +238,56 @@ the wrong controller?
 
 ## Architecture summary
 
-![outline of how the individual components
-interact](../images/controller-engine-v2.svg)
+```mermaid
+flowchart LR
+    %% Define front-end web components
+    subgraph io["IO"]
+        co["Control Object"]
+        midiIO["Midi IO"]
+        hidIO["HID IO"]
+        mixxxLib["Mixxx Library"]
+        mixxxUi["Mixxx UI"]
+    end
+    style io fill:transparent,stroke:green,color:#fff
+
+    subgraph layers["Intermediary Layers"]
+        co---midiDispatcher["MIDI Dispatcher"]
+        midiIO---midiDispatcher
+        mixxxUi---uiShift["UI Shift Capability"]
+    end
+    style layers fill:transparent,stroke:yellow,color:#fff
+
+    subgraph proxies["API Proxies"]
+        co---coJSProxy["COJSProxy"]
+        co---coQMLProxy["COQmlProxy"]
+        midiIO---midiJSProxy["MIDI IO JSProxy"]
+        midiIO---midiQMLProxy["MIDI IO QmlProxy"]
+        hidIO---hidJSProxy["HID IO JSProxy"]
+        hidIO---hidQMLProxy["HID IO QMLProxy"]
+        midiDispatcher---midiDispatcherJSProxy["MIDI Dispatcher JSProxy"]
+        mixxxLib---libQmlProxy["Library QmlProxy"]
+        uiShift---CapJSProxy["Capability JSProxy"]
+    end
+    style proxies fill:transparent,stroke:cyan,color:#fff
+
+    subgraph engine["Execution Engine"]
+        coJSProxy---jsEngine["JSExecution Engine"]
+        midiJSProxy---jsEngine
+        hidJSProxy---jsEngine
+        hidQMLProxy---jsEngine
+        midiDispatcherJSProxy---jsEngine
+        CapJSProxy---jsEngine
+        coJSProxy---jsLegacyEngine["LegacyJS Execution Engine"]
+        hidJSProxy---jsLegacyEngine
+        hidQMLProxy---jsLegacyEngine
+        midiJSProxy---jsLegacyEngine
+        CapJSProxy---jsLegacyEngine
+        coQMLProxy---qmlEngine["QmlExecutionEngine"]
+        midiQMLProxy---qmlEngine
+        libQmlProxy---qmlEngine
+    end
+    style engine fill:transparent,stroke:red,color:#fff
+```
 
 ## Action Plan
 
