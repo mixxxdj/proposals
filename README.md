@@ -6,12 +6,12 @@ reviewing, discovering, and working on the design documents. It is also a record
 ## Current Proposals
 
 * The
-  [open PRs with the `proposal` label](https://github.com/acolombier/mixxx-proposals/pulls?q=is%3Aopen+is%3Apr+label%3Aproposal)
+  [open PRs with the `proposal` label](https://github.com/mixxxdj/proposals/pulls?q=is%3Aopen+is%3Apr+label%3Aproposal)
   show all the pending proposals.
 * The [proposals directory](./proposals) shows all the accepted proposals. See the “Implementation Status” for details
   on the implementation.
 * The
-  [PRs with the `proposal` label that are closed without merging](https://github.com/acolombier/mixxx-proposals/pulls?q=is%3Apr+label%3Aproposal+is%3Aclosed+is%3Aunmerged)
+  [PRs with the `proposal` label that are closed without merging](https://github.com/mixxxdj/proposals/pulls?q=is%3Apr+label%3Aproposal+is%3Aclosed+is%3Aunmerged)
   show all the rejected proposals.
 
 ## What’s a Design Document?
@@ -40,7 +40,7 @@ Don’t get scared to propose ideas! It’s amazing to innovate in the open and 
 
 The process of proposing a change via a design document is the following:
 
-1. Fork `github.com/acolombier/mixxx-proposals`.
+1. Fork `github.com/mixxxdj/proposals`.
 2. Create a GitHub Pull Request with a design document in markdown format to the [proposals directory](./proposals).
    Make sure to use the [template](YYYY-MM-DD_template.md) as the guide for what sections should be present in the
    document. Put the creation date (the day you started preparing this design document) as the prefix and some unique
