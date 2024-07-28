@@ -274,7 +274,7 @@ flowchart LR
         coJSProxy---jsEngine["JSExecution Engine"]
         midiJSProxy---jsEngine
         hidJSProxy---jsEngine
-        hidQMLProxy---jsEngine
+        hidQMLProxy---qmlEngine
         midiDispatcherJSProxy---jsEngine
         CapJSProxy---jsEngine
         coJSProxy---jsLegacyEngine["LegacyJS Execution Engine"]
