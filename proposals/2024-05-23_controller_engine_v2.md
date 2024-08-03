@@ -106,7 +106,8 @@ PRs section:
 Goals and use cases for the solution as proposed in [How](#how):
 
 * Allow multiple controllers to be used at the same time.
-* Mappings should be able to organize themselves into modules.
+* Mappings should be able to be partitioned / modularized within their subfolder.
+* Code reuse across mappings should be easier and encouraged (complex hardware of the same vendor often shares functionality).
 * IO protocols should easily be changeable and not not be tied to the mapping.
 * Allow easy, gradual implementation of the system.
 
@@ -133,7 +134,8 @@ Built-in mappings reside in `res/controllers/` where each mapping is a directory
 containing at least a manifest file named `manifest.xxx` (where `.xxx` is the
 language-specific file extension (eg. `.xml`, `.yml`, `.json`, etc)).
 Additionally, `res/controllers/lib` contains shared modules that can be used by
-multiple mappings (such as componentsJS).
+multiple mappings (such as componentsJS). Mapping folders may be zipped during
+export (see considerations regarding shared modules) for the users convenience.
 
 ### Manifest
 
@@ -145,13 +147,17 @@ following information:
   * Used Mixxx APIs
 * Capabilities
 
+In order to reduce boilerplate markup in the manifest, syntactic shorthands may
+be introduced to cover the most common usecases. The most common usecase may be that
+only one source and sink of a particular protocol coupled to a single execution
+engine and/or protocol dispatcher.
+
 ### Sources and Sinks
 
 Sources and Sinks are the endpoints of the controller. They are defined in the
 manifest and are used to define the IO protocol of the controller. They are
-characterized by their protocol (eg. MIDI, HID, Bulk, etc), their direction (eg.
-input, output, bidirectional) and optionally explicitly their underlying
-implementation (eg. `portmidi`, `rtmidi`, `libremidi`, etc). They will also
+characterized by their protocol (eg. MIDI, HID, Bulk, etc) and their direction (eg.
+input, output, bidirectional). They will also
 contain a heuristic description to map the source/sink to the physical
 controller (protocol specific, in the case of HID, usb vid&pid could be used for
 example).
@@ -163,7 +169,11 @@ scripting engine that will be used to evaluate the mapping. It is defined by its
 type (JS, QML, something else?) along with a specific entry point. In the case
 of JS, this would be a ES6 module that exports a controller class to be
 instantiated. In the case of QML, this would be a QML file that defines a
-controller object.
+controller object. Each Execution engine should be run in its own independent
+thread. Data exchange between threads should be non-blocking where possible,
+preferably using Qt Signal/Slots or Non-blocking pipes (since those two are used
+in mixxx already). Scheduling requirements are handled by each engine individually
+(eg refreshrate for a GUI engine or latency requirements of an engine handling IO).
 
 ### Capabilities
 
@@ -287,6 +297,57 @@ flowchart LR
         libQmlProxy---qmlEngine
     end
     style engine fill:transparent,stroke:red,color:#fff
+```
+
+### Manifest Mockup
+
+While the manifest is supposed to be implemented language-independent, the easiest
+implementation would likely be based on XML, as Qt already contains the necessary
+parsing infrastructure. So it makes sense to use XML for mockups. Inline XML comments
+serve as explanation to the reader of this proposal and are not intended to be part
+of real manifests.
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- lets start with the same header are our current mapping, though we distinguish from the old format
+using the schemaVersion -->
+<MixxxControllerPreset mixxxVersion="2.6.0+" schemaVersion="2">
+  <!-- the info section matches the old schema for now -->
+  <info>
+    <name></name>
+    <author></author>
+    <description></description>
+    <manual></manual>
+  </info>
+  <sources>
+    <!-- the id is used to refer to this entry by name in the remaining document-->
+    <midi id="controlInput"/>
+  </sources>
+  <sinks>
+    <midi id="controlOutput"/>
+    <bulk id="screenOutput"/>
+  </sinks>
+  <engines>
+    <Javascript id="js" entry="path-to-main-module.mjs">
+      <!-- the handler is a property on the exported module object that receives all data from the sink -->
+      <sinkRef id="controlInput" handler="incomingData"/>
+      <sourceRef id="controlOutput"/>
+      <!-- if the sources and sinks are not referenced from multiple locations, the sinkref
+      could be replaced directly by the corresponding entry -->
+    </Javascript>
+    <QMLUI id="js">
+      <sinkRef id="screenOutput">
+    </QMLUI>
+  </engines>
+  <dispatchers>
+    <!-- should this midi tag be disambiguated from the ones in other sections? -->
+    <midi source="controlInput" sink="controlOutput">
+      <!-- this would contain the <control> entries from the legacy format -->
+    </midi>
+  </dispatchers>
+  <settings>
+    <!-- same as legacy format -->
+  </settings>
 ```
 
 ## Action Plan
