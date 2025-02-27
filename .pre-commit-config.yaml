@@ -3,6 +3,7 @@ repos:
     rev: v4.6.0
     hooks:
       - id: check-added-large-files
+        exclude: ^proposals/contents/.*\.svg$
       - id: check-symlinks
       - id: end-of-file-fixer
       - id: check-byte-order-marker
@@ -22,6 +23,7 @@ repos:
     rev: v2.2.6
     hooks:
       - id: codespell
+        exclude: ^proposals/contents/.*\.svg$
         args:
           - --ignore-words
           - .codespellignore
