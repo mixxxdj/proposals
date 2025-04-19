@@ -1,0 +1,12 @@
+name: Git Checks
+
+on: [pull_request]
+
+jobs:
+  block-fixup:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Block Fixup Commit Merge
+        uses: 13rac1/block-fixup-merge-action@a85db59578fc612bc89431bf34e792bc4ec3eab9 # v2.0.0
