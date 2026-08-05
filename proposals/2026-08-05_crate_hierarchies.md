@@ -28,22 +28,21 @@
 
 ## Why
 
-We need a way to organize crates into a hierarchy, so we can deal with large numbers of crates in a more useful way:
-
+We need a way to organize crates into a hierarchy, so we can deal with large numbers of crates in a more useful way,
 
 ### Pitfalls of the current solution
 
 The current solution boils down to manually naming crates in a hierarchy.
 
-* There is no easy way to move multiple crates at once within the hierarchy. Every change of the hierarchy requires manually changing the title of each crate one-by-one.
-* There is no way to hide crates that are completely irrelevant to the DJ set you are currently playing. This gets kind of bad if you play on very different occasions:
+* There is no easy way to **move** multiple crates at once within the hierarchy. Every change of the hierarchy requires manually changing the title of each crate one-by-one.
+* There is no way to temporarily **hide** crates that are completely irrelevant to the DJ set you are currently playing. This gets kind of bad if you play on very different occasions:
   * For a wedding, I may have 15 different crates for different stages of the evening & mood.
   * For a second wedding, I may have another 10 crates, as they have requested different music.
   * I also play music for West Coast Swing, and have 20 crates for different moods, difficulty levels and genres.
   * And I also play Ballroom & Latin music.
   * And I also play Salsa music.
   * Due to this, I have over 150 different crates.
-* There's no way to manipulate a number of crates at once (e.g. export and then delete all crates associated with a wedding after that wedding is over).
+* There's no way to **manipulate** a number of crates at once (e.g. export and then delete all crates associated with a wedding after that wedding is over).
 
 > There are also some more UX / screen real estate problems once the number of crates hits a certain threshold:
 > * The crate tree in the sidebar becomes large & unwieldy (which this proposal would solve), making drag & drop as well as finding the right crate a nightmare.
