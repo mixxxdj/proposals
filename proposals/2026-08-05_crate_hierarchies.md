@@ -34,15 +34,15 @@ We need a way to organize crates into a hierarchy, so we can deal with large num
 
 The current solution boils down to manually naming crates in a hierarchy.
 
-* There is no easy way to **move** multiple crates at once within the hierarchy. Every change of the hierarchy requires manually changing the title of each crate one-by-one.
-* There is no way to temporarily **hide** crates that are completely irrelevant to the DJ set you are currently playing. This gets kind of bad if you play on very different occasions:
+* There is **no easy way to _move_ multiple crates** at once within the hierarchy. Every change of the hierarchy requires manually changing the title of each crate one-by-one.
+* There is **no way to _temporarily hide_ crates** that are completely irrelevant to the DJ set you are currently playing. This gets kind of bad if you play on very different occasions:
   * For a wedding, I may have 15 different crates for different stages of the evening & mood.
   * For a second wedding, I may have another 10 crates, as they have requested different music.
   * I also play music for West Coast Swing, and have 20 crates for different moods, difficulty levels and genres.
   * And I also play Ballroom & Latin music.
   * And I also play Salsa music.
   * Due to this, I have over 150 different crates.
-* There's no way to **manipulate** a number of crates at once (e.g. export and then delete all crates associated with a wedding after that wedding is over).
+* There's **no way to _manipulate_ a number of crates** at once (e.g. export and then delete all crates associated with a wedding after that wedding is over).
 
 > There are also some more UX / screen real estate problems once the number of crates hits a certain threshold:
 > * The crate tree in the sidebar becomes large & unwieldy (which this proposal would solve), making drag & drop as well as finding the right crate a nightmare.
@@ -58,6 +58,9 @@ Goals and use cases for the solution as proposed in [How](#how):
 * Allow expanding/collapsing nodes in the crate hierarchy.
 * Defer every decision that can be deferred until after this MVP.
 
+This is also the time to decide on "Crates + Folders" vs. "Nested Crates"/"Subcrates".
+This is more of a personal preference thing than anything else, so let's just have a vote and get it over with.
+
 ### Audience
 
 The target audience that this change relates to:
@@ -67,22 +70,40 @@ The target audience that this change relates to:
 
 ## Non-Goals
 
-Explicit non-goals for the solution as proposed in [How](#how):
+Explicit non-goals for the solution as proposed in [How](#how), which could all also be called "Future work":
 
-* Solving the non-sidebar-related UX problems that occcur once the number of crates hits a certain threshold:
+* Deciding on the **final user-facing name** for what to call those crates nested inside another crate. Let's just go with "Sub-Crate", and then have separate vote whether we should call it "Child Crates", "Nested Crates", "Inner Crates" or something else instead. The author of this proposal is not partial to any particular name.
+
+* Solving the **non-sidebar-related UX problems** that occcur once the number of crates hits a certain threshold:
   * The "Crate"/"Move to Crate" context menu item for tracks becomes unwieldy & takes up a lot of screen space (which this proposal would not make worse that it is right now anyway, and is probably best solved in a separate PR/proposal). We can have a look at Spotify for a potential solution, as they are solving are very similar problem, and are solving it by combining a search box with a "most recently used" list.
+
   * A potential "Move to Parent Crate" context menu item for crates has the same problem, but could be solved using the same approach, once one has been found.
-* Making a final decision on whether tracks from nested crates should or should not be shown in the parent crate, or whether the user should be able to make that choice.
-* Making the solution generalizable to playlists.
+
+* Making a final decision on **whether tracks from nested crates should or should not be shown** in the parent crate, or whether the user should be able to make that choice.
+
+* Deciding what it should mean to **mark a parent crates as an "Auto DJ source"**. The answer is likely to be the same as for the point above.
+
+* Finding a final solution (or deciding it is not needed) for **how to indicate the currently selected track is part of a not-currently-visible subcrate** in the sidebar.
+  For now: You are likely to have the crates you are currently working with visible anyway, and likely to not care about the ones you cannot see right now,
+  but that is a separate discussion.
+
+  (Context: Crates and playlists are displayed in bold when they contain the track that is currently selected in the table view).
+* Making the solution generalizable to playlists (though it likely is).
+* Providing "Export All Sub-Crates to Playlist" or similar features that build upon this.
 
 ## How
 
-Explain the full overview of the proposed solution. Some guidelines:
-
-* Make it concise and **simple**; put diagrams; be concrete, avoid using “really”, “amazing” and “great” (:
-* How you will test and verify?
-* How you will migrate users, without downtime. How we solve incompatibilities?
-* What open questions are left? (“Known unknowns”)
+* Crates can be nested inside other crates (like a file inside a folder).
+* Such nested crates are displayed in the sidebar tree in the obvious way, i.e. as children of their parent crate.
+* Nested crates (which we'll call "Sub-Crates") can be created the following ways:
+  * By dragging an existing crate (B) onto a new parent crate (A) in the sidebar.
+  * By selecting an existing crate (A) in the sidebar, and choosing "Create New Sub-Crate" from the context menu to create a sub-crate (B).
+  * By selecting an existing crate (A) in the sidebar, and choosing "Import Sub-Crate" from the context menu to create a sub-crate from a playlist file (B).
+* Selecting a crate in the sidebar will (for now) only show the tracks in that crate, but not those from the parent crates.
+  * The suggested next step for better UX would be to provide a checkbox "Hide tracks from nested crates" in the header section
+    of the tracks table. By "header section" I mean the area where e.g. the Auto DJ view places its controls.
+    This would both make it apparent to the user what is going on, expose them to the existence of that option,
+    and allow everyone to use their preferred workflow.
 
 ## Alternatives
 
