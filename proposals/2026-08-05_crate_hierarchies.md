@@ -1,10 +1,4 @@
-# Template
-
-Feel free to copy this file and feel all the details below.
-
-See [README](README.md) for details.
-
-## Crate Hierarchies / Nested Crates / Subcrates
+# Crate Hierarchies / Nested Crates / Subcrates
 
 * **Owners:**
   * @cr7pt0gr4ph7
@@ -24,10 +18,9 @@ See [README](README.md) for details.
 * **Other docs or links:**
   * `<Links…>`
 
-> We need a way to organize crates into a hierarchy
-> idea of proposer's view on proposed changes.
->
-> *For example: This design doc is proposing a consistent design template for “example.com” organization.*
+> We need a way to organize crates into a hierarchy, so we can deal with large numbers of crates more useful.
+> There's a reason why filesystem have folders instead of a flat hierarchy.
+
 
 ## Why
 
@@ -40,11 +33,17 @@ future designs.*
 
 ### Pitfalls of the current solution
 
-What specific problems are we hitting with the current solution? Why it’s not enough?
+The current solution boils down to manually naming crates in a hierarchy.
 
-*For example, We were missing a consistent design doc template, so each team/person was creating their own. Because of
-inconsistencies, those documents were harder to understand, and it was easy to miss important sections. This was
-causing certain engineering time to be wasted.*
+* There is no easy way to move multiple crates at once within the hiearchy. Every change of the hierarchy requires manually changing the title of each crate one-by-one.
+* There is no way to hide crates that are completely irrelevant to the DJ set you are currently playing. This gets kind of bad if you play on very different occasions:
+  * For a wedding, I may have 15 different crates for different stages of the evening & mood.
+  * For a second wedding, I may have another 10 crates, as they have requested different music.
+  * I also play music for West Coast Swing, and have 20 crates for different moods, difficulty levels and genres.
+  * And I also play Ballroom & Latin music.
+  * And I also play Salsa music.
+  * Due to this, I have over 150 different crates.
+* There's no way to manipulate a number of crates at once (e.g. export and then delete all crates associated with a wedding after that wedding is over).
 
 ## Goals
 
