@@ -18,24 +18,24 @@
 * **Other docs or links:**
   * `<Links…>`
 
-> We need a way to organize crates into a hierarchy, so we can deal with large numbers of crates more useful.
+> We need a way to organize crates into a hierarchy, so we can deal with large numbers of crates in a more useful way.
 > There's a reason why filesystem have folders instead of a flat hierarchy.
+> 
+> The demand & usefulness of this feature is evident from the fact that there has been continued discussion & proposals for the last 16(!) years,
+> that always got stuck in limbo for one reason or the other. This proposal is an attempt to _finally_ get something out the door,
+> to be able to iteratively improve it afterwards.
 
 
 ## Why
 
-Put here a motivation behind the change proposed by this design document, give context.
+We need a way to organize crates into a hierarchy, so we can deal with large numbers of crates in a more useful way:
 
-*For example: It’s important to clearly explain the reasons behind certain design decisions in order to have a consensus
-between team members, as well as external stakeholders. Such a design document can also be used as a reference and
-knowledge-sharing purposes. That’s why we are proposing a consistent style of the design document that will be used for
-future designs.*
 
 ### Pitfalls of the current solution
 
 The current solution boils down to manually naming crates in a hierarchy.
 
-* There is no easy way to move multiple crates at once within the hiearchy. Every change of the hierarchy requires manually changing the title of each crate one-by-one.
+* There is no easy way to move multiple crates at once within the hierarchy. Every change of the hierarchy requires manually changing the title of each crate one-by-one.
 * There is no way to hide crates that are completely irrelevant to the DJ set you are currently playing. This gets kind of bad if you play on very different occasions:
   * For a wedding, I may have 15 different crates for different stages of the evening & mood.
   * For a second wedding, I may have another 10 crates, as they have requested different music.
@@ -45,22 +45,36 @@ The current solution boils down to manually naming crates in a hierarchy.
   * Due to this, I have over 150 different crates.
 * There's no way to manipulate a number of crates at once (e.g. export and then delete all crates associated with a wedding after that wedding is over).
 
+> There are also some more UX / screen real estate problems once the number of crates hits a certain threshold:
+> * The crate tree in the sidebar becomes large & unwieldy (which this proposal would solve), making drag & drop as well as finding the right crate a nightmare.
+> * The "Crate"/"Move to Crate" context menu item for tracks becomes unwieldy & takes up a lot of screen space (which this proposal would not make worse that it is right now anyway, and is probably best solved in a separate PR/proposal).
+> * A potential "Move to Parent Crate" context menu item for crates has the same problem, but could be solved using the same approach, once one has been found.
+  
 ## Goals
 
 Goals and use cases for the solution as proposed in [How](#how):
 
-* Allow easy collaboration and decision making on design ideas.
-* Have a consistent design style that is readable and understandable.
-* Have a design style that is concise and covers all the essential information.
+* Provide the most basic implementation of hierarchical crates that gets the job done.
+* Provide drag & drop support for editing crate hierachies.
+* Allow expanding/collapsing nodes in the crate hierarchy.
+* Defer every decision that can be deferred until after this MVP.
 
 ### Audience
 
-If not clear, the target audience that this change relates to.
+The target audience that this change relates to:
+
+* End users that want to organize their crate library.
+* Maintainers that care about the backend organization of the code.
 
 ## Non-Goals
 
-* Move old designs to the new format.
-* Not doing X,Y,Z.
+Explicit non-goals for the solution as proposed in [How](#how):
+
+* Solving the non-sidebar-related UX problems that occcur once the number of crates hits a certain threshold:
+  * The "Crate"/"Move to Crate" context menu item for tracks becomes unwieldy & takes up a lot of screen space (which this proposal would not make worse that it is right now anyway, and is probably best solved in a separate PR/proposal). We can have a look at Spotify for a potential solution, as they are solving are very similar problem, and are solving it by combining a search box with a "most recently used" list.
+  * A potential "Move to Parent Crate" context menu item for crates has the same problem, but could be solved using the same approach, once one has been found.
+* Making a final decision on whether tracks from nested crates should or should not be shown in the parent crate, or whether the user should be able to make that choice.
+* Making the solution generalizable to playlists.
 
 ## How
 
@@ -73,10 +87,39 @@ Explain the full overview of the proposed solution. Some guidelines:
 
 ## Alternatives
 
-The section stating potential alternatives. Highlight the objections reader should have towards your proposal as they
-read it. Tell them why you still think you should take this path.
+### Alternative 1: Implicitly grouping crates by name
 
-1. This is why not solution Z...
+One alternative proposal, as put forward by @Eve00000 in mixxxdj/mixxx#13978, is to be able to use separators in the name of crates
+that are treated as a path. I.e. a crate named `Root A/Parent B/Crate C` is displayed as follows in the sidebar:
+
+```
+> Root A
+  > Parent B
+    > Crate C/
+```
+
+Pros:
+1. Requires no DB schema change.
+
+Cons:
+1. This makes the internal implementation of moving crates around in the tree harder than it needs to be,
+   while not providing a discernible benefit.
+2. It is basically equivalent to either "Subcrates" (this proposal) or "Crates + Folders" (Alternative 2).
+
+
+### Alternative 2: Crates + Folders
+
+The initial suggestion put forward by the author of this proposal (@cr7pt0gr4ph7) was 
+
+Pros:
+1. The differentiation between "Leaf Nodes" and "Folders" may (or may not) allow us to do better organize
+   the crates in the UI when displaying them in the context menu.
+
+Cons:
+1. The DB schema is more complicated due to the separate `crate_folders` table.
+2. The implementation is more complicated due to having to deal with two different entity types in the sidebar tree,
+   and there's a lot of duplication going on (e.g. `CrateId`/`CrateFolderId`/`CrateOrFolderId`).
+4. The user has to mentally deal with two different entity types ("crates" and "folders") instead of only one.
 
 ## Action Plan
 
