@@ -91,6 +91,10 @@ Explicit non-goals for the solution as proposed in [How](#how), which could all 
 * Making the solution generalizable to playlists (though it likely is).
 * Providing "Export All Sub-Crates to Playlist" or similar features that build upon this.
 
+* Finding a better solution for the deletion of parent crates that: A) Allows users to delete a whole crate hierarchy if desired, but B) prevents them from accidentally deleting the "wrong" 50 crates, or at least gives them an easy way to restore them for now.
+  * We could evaluate the option moving deleted crates to a recycling bin by marking them with a `deleted` flag, which would also allow us to implement an undo.
+
+
 ## How
 
 * Crates can be nested inside other crates (like a file inside a folder).
@@ -104,6 +108,10 @@ Explicit non-goals for the solution as proposed in [How](#how), which could all 
     of the tracks table. By "header section" I mean the area where e.g. the Auto DJ view places its controls.
     This would both make it apparent to the user what is going on, expose them to the existence of that option,
     and allow everyone to use their preferred workflow.
+* Deleting a parent crate is only possible when it has no subcrates (for now).
+  * This avoids the possible damage accidentally deleting the wrong parent crate could cause.
+    We could evaluate the option moving deleted crates to a recycling bin, which would also
+    allow us to implement an undo.
 
 ## Alternatives
 
@@ -145,5 +153,20 @@ Cons:
 
 The tasks to do in order to migrate to the new idea.
 
-* [ ] Task one <GH issue>
-* [ ] Task two <GH issue> ...
+- [ ] Decide on "Nested Crates"/"Sub-Crates" vs. "Crates + Folders" (@all maintainers)
+* [ ] Provide the infrastructure for working with a nullable `parent_id` column
+  * [ ] mixxxdj/mixxx#16829 (DbId: Add `DbId::toVariantOrNull()` method for working with nullable database IDs)
+* [ ] Provide the infrastructure for drag & drop within the sidebar
+  * [ ] mixxxdj/mixxx#16835 (TreeItemModel: Add `TreeItem::getUrl`/`setUrl`, `TreeItemModel::kUrlRole` and `SidebarModel::UrlRole`)
+  * [ ] TBD (Sidebar: Provide infrastructure for drag & drop of sidebar items) &mdash; the current implementation only allows for D&D _onto_ sidebar items, but not for the D&D _of_ sidebar items. This will also fix some bugs/issues with the behavior of the sidebar tree related to D&D.
+* [ ] Provide the infrastructure for restoring the expansion state of sidebar child items (necessary when we rebuild the tree after the list or hierarchy of crates has changed)
+  * [ ] mixxxdj/mixxx#16833 (WLibrarySidebar: Add `setChildIndexExpanded`/`isChildIndexExpanded`)
+* [ ] Provide an implementation of nested crates after those foundations have been merged (currently being prepared by @cr7pt0gr4ph7).
+
+Future work:
+* [ ] Update the user-manual with information on "Sub-Crates"
+* [ ] Decide on a final user-facing name for "Nested Crates" / "Sub-Crates" / "Inner Crates" / "Child Crates" / ...
+* [ ] Decide on a final user-facing name for "Parent Folder" / "Parent Crate" / "Folder" / "Containing Crate" / ...
+* [ ] Add a "Move to Parent Crate" context menu item
+* [ ] Improve the UX of "Move to Parent Crate" for large numbers of crates
+* [ ] Improve the UX of "Move to Crate" for large numbers of crates
