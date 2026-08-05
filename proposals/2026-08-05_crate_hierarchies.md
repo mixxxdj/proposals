@@ -113,6 +113,15 @@ Explicit non-goals for the solution as proposed in [How](#how), which could all 
     We could evaluate the option moving deleted crates to a recycling bin, which would also
     allow us to implement an undo.
 
+On the implementation side:
+
+* The **`crates` table gets a _new_ `parent_id` field** that points to the parent crate, or is NULL for crates at the root of the hierarchy.
+* The **uniqueness requirement on `crates.name` is _fully removed_** (i.e. we do NOT place a new uniqueness requirement on the tuple `(crates.id, crates.name)`)
+  to allow easier implementation of e.g. the recycling bin, undo, deletion as well as a few other scenarios, and to avoid issues during drag & drop.
+
+  Basically, there's no reason why we should have a "Do you want to skip / rename / overwrite ...?" dialog when we do not actually need the names to be unique internally.
+  Or why we should unecessarily incur the hassle for scenarios like: Delete Crate "A/B", Create a new Crate "A/B", Restore the previously deleted crate from the recycling bin into its original location.
+
 ## Alternatives
 
 ### Alternative 1: Implicitly grouping crates by name
