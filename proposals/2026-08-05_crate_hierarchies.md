@@ -12,7 +12,7 @@
     * Discussion: mixxxdj/mixxx#7481 (hierarchical library display)  &mdash; ca. 2010: Another mention of hierarchical crates.
     * PR: mixxxdj/mixxx#10997 by @ywwg (Crate archives) &mdash; ca. 2022: One of the initial implementations of a single archive folder, abandoned by the author @ywwg in 2025 in favor of having user-defined hiearchies.
     * PR: mixxxdj/mixxx#13978 by @Eve00000 (Grouped crates) &mdash; ca. 2024: Alternative implementation based on storing the crate's full path in its name. Stalled since the start of 2025.
-    * PR: mixxxdj/mixxx#4182 by @Eve00000 (SearchCrates) &mdash; ca. 2025: Tangentially related, orthogonal proposal of adding dynamic crates whose content is determine by a search query.
+    * PR: mixxxdj/mixxx#4182 by @Eve00000 (SearchCrates) &mdash; ca. 2025: Tangentially related, orthogonal proposal of adding dynamic crates whose content is determined by a search query.
    * Nested Playlists / Playlist Folders
      * PR: mixxxdj/mixxx#16669 (Subfolder for Playlist) &mdash; 2026: Implementation of folders for playlists.
      * Issue: mixxxdj/mixxx#3413 (Subfolder for Playlist) &mdash; 2024: Feature request for playlist folders.
