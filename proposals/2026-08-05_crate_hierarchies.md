@@ -170,10 +170,12 @@ The tasks to do in order to migrate to the new idea.
   * [ ] mixxxdj/mixxx#16829 (DbId: Add `DbId::toVariantOrNull()` method for working with nullable database IDs)
 * [ ] Provide the infrastructure for drag & drop within the sidebar
   * [ ] mixxxdj/mixxx#16835 (TreeItemModel: Add `TreeItem::getUrl`/`setUrl`, `TreeItemModel::kUrlRole` and `SidebarModel::UrlRole`)
-  * [ ] TBD (Sidebar: Provide infrastructure for drag & drop of sidebar items) &mdash; the current implementation only allows for D&D _onto_ sidebar items, but not for the D&D _of_ sidebar items. This will also fix some bugs/issues with the behavior of the sidebar tree related to D&D.
+  * [ ] mixxxdj/mixxx#16869 (Sidebar: Provide infrastructure for drag & drop of sidebar items) &mdash; the current implementation only allows for D&D _onto_ sidebar items, but not for the D&D _of_ sidebar items. This will also fix some bugs/issues with the behavior of the sidebar tree related to D&D.
+  * [ ] mixxxdj/mixxx#16870 (Sidebar: Use different times for auto-expand vs. auto-collapse of sidebar items) &mdash; Improvements to the auto-expand/auto-collapse behavior of sidebar items.
 * [ ] Provide the infrastructure for restoring the expansion state of sidebar child items (necessary when we rebuild the tree after the list or hierarchy of crates has changed)
   * [ ] mixxxdj/mixxx#16833 (WLibrarySidebar: Add `setChildIndexExpanded`/`isChildIndexExpanded`)
-* [ ] Provide an implementation of nested crates after those foundations have been merged (currently being prepared by @cr7pt0gr4ph7).
+* [ ] Provide an implementation of nested crates after those foundations have been merged
+  * [ ] mixxxdj/mixxx#16871 (Feature: Sub-Crates / Nested Crates)
 
 Future work:
 * [ ] Update the user-manual with information on "Sub-Crates"
