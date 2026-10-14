@@ -1,272 +1,343 @@
-# rekordbox USB Export (PDB/ANLZ) for CDJ/XDJ hardware
+# rekordbox USB Export for CDJ/XDJ Hardware
 
-* **Owners:** @sparkly-quasar (openboxxx)
-* **Implementation Status:** Partially implemented. Standalone writer proven and verified against
-  independent parsers; in-Mixxx exporter working in a fork that compiles + links on macOS
-  (Intel + Apple Silicon), Windows, and Linux via CI. Pending rekordbox-desktop import
-  (verification tier 3) and physical CDJ/XDJ playback (tier 4).
+* **Owners:** @sparkly-quasar
+* **Implementation Status:** Partially implemented (prototype). A standalone C++ writer (openboxxx) and
+  an in-Mixxx export button exist in a fork, but the writer is still missing structures that players
+  require (see How ▸ Format requirements), and nothing has been tested in rekordbox or on CDJ/XDJ
+  hardware yet.
 * **Related Issues and PRs:**
-  * mixxxdj/mixxx#9463 — original "export crates/cues/beatgrids to rekordbox USB" request
-  * mixxxdj/mixxx#10321 — "Rekordbox USB Export (PDB/ANLZ)"
-  * mixxxdj/mixxx#12126 — "Abstract over library exporters" (the architectural hook)
-  * mixxxdj/mixxx#15556 — "Add OneLibrary support" (explicitly *out of scope* here; see Non-Goals)
-  * mixxxdj/mixxx#13293 — updated rekordbox Kaitai definitions (import-side)
+  * Feature requests: mixxxdj/mixxx#9463, mixxxdj/mixxx#10321 (Device Library export),
+    mixxxdj/mixxx#15556 (OneLibrary)
+  * Mixxx architecture: mixxxdj/mixxx#12126 (abstract over library exporters), mixxxdj/mixxx#12873
+    (earlier discussion of rekordcrate and Rust in Mixxx)
+  * Mixxx importer: mixxxdj/mixxx#16895 (hidden `.PIONEER` directory), mixxxdj/mixxx#16121
+    (unique `analyze_path`)
+  * libdjinterop: xsco/libdjinterop#194 (rekordcrate integration), xsco/libdjinterop#199 (SQLCipher,
+    merged), xsco/libdjinterop#196 and xsco/libdjinterop#204 (OneLibrary reading)
+  * rekordcrate: Holzhaus/rekordcrate#259 (device export from scratch), Holzhaus/rekordcrate#264
+    (ANLZ path calculation), Holzhaus/rekordcrate#269 (Device Library Plus)
+  * Format findings: Deep-Symmetry/crate-digger#46
 * **Other docs or links:**
-  * Mixxx fork with the working exporter:
+  * Prototype: [openboxxx](https://github.com/sparkly-quasar/openboxxx) (standalone writer) and
     [sparkly-quasar/mixxx `feat/rekordbox-usb-export`](https://github.com/sparkly-quasar/mixxx/tree/feat/rekordbox-usb-export)
-  * Downloadable tri-platform CI builds:
-    [openboxxx Releases](https://github.com/sparkly-quasar/openboxxx/releases)
-  * openboxxx design docs + component status table: `libopenboxxx-export/README.md`; plus
-    architecture, export-design, legal, research-findings (linked inline)
-  * pyrekordbox (Dylan Jones, MIT) — ANLZ/PDB reference implementation
-  * Deep Symmetry `crate-digger` / `dysentery` `.ksy` specs (format documentation)
-  * rekordcrate (Jan Holthuis, MPL-2.0) — Rust PDB parser/serializer
+    (Mixxx integration)
+  * [fragmede/rekordbox-pdb FORMAT.md](https://github.com/fragmede/rekordbox-pdb/blob/ee3bac2f22ca11a5ce61eea35f8cb951c246eaef/FORMAT.md)
+    (MIT): write-side `export.pdb` invariants from byte-level diffs of real exports
+  * [AnnoyingTechnology PIONEER.md](https://github.com/AnnoyingTechnology/rhythmbox-to-pioneer-xdj-exporter/blob/master/PIONEER.md):
+    ANLZ path hash, history tables, hardware notes
+  * [AlphaTheta USB notice](https://alphatheta.com/en/information/important-notice-for-customers-using-usb-devices-with-our-dj-equipment/):
+    which players read which format
+  * Related projects: pyrekordbox (MIT), rekordcrate (MPL-2.0), libdjinterop (LGPL-3.0),
+    crate-digger (EPL-2.0 with MPL-2.0/LGPL-3.0 as secondary licences),
+    [seabass](https://invent.kde.org/multimedia/seabass) (KDE)
 
 ---
 
+## Changes in this revision
+
+This revision incorporates @markst's review. Thank you for it. The main changes:
+
+* **Scope covers both Pioneer USB formats.** OneLibrary moved from a non-goal to an explicit decision
+  for maintainers, because the newest players can't read anything else.
+* **The writer backend is now an open choice** between three options (openboxxx, rekordcrate, and
+  libdjinterop), instead of proposing openboxxx's writer as the answer.
+* **Corrected overstated claims** about table coverage, the round-trip verifier, CI, rekordbox 7
+  behaviour, and the hardware test matrix.
+* **Added the format requirements real players enforce**, with sources and openboxxx's current status
+  against each.
+
 > **A note from the author.** I'm a long-time Mixxx user, not a professional C/C++ developer. This
-> exporter grew out of experimenting with AI-assisted ("vibecoding") development, and getting a real
-> stick to round-trip through the parsers felt like a genuinely worthwhile use of that time — so I'd
-> like to offer it back to the community as a gift. I have no attachment to *my* code being the
-> answer; if the right outcome is that this informs a rekordcrate-based path (or anything else the
-> maintainers prefer), that's a win. I'm mainly hoping to move #9463 forward and to help however is
-> most useful, including finding CDJ hardware testers.
+> work grew out of experimenting with AI-assisted ("vibecoding") development, and I'd like to offer it
+> back to the community. I have no attachment to *my* code being the answer. If the right outcome is
+> that Mixxx builds on rekordcrate or libdjinterop, that's a win. I'm mainly hoping to move
+> mixxxdj/mixxx#9463 forward and to help however is most useful, including finding CDJ hardware
+> testers.
 
 ## TL;DR
 
-Mixxx can *import* rekordbox libraries but cannot *export* to the USB format that
-Pioneer/AlphaTheta CDJ and XDJ hardware reads. This proposal adds a **rekordbox USB
-exporter**: a writer for the unencrypted `export.pdb` (DeviceSQL) and per-track `ANLZ`
-(`.DAT`/`.EXT`) analysis files, plus the `PIONEER/` USB directory layout and audio-file
-copy — the same kind of "export my whole library to foreign DJ hardware" flow Mixxx
-already ships for Engine DJ / Engine Prime.
+Mixxx can import rekordbox USB sticks but can't create them. This proposal adds an "Export to rekordbox
+USB" feature, so Mixxx users can play their prepared library on Pioneer/AlphaTheta CDJ and XDJ
+hardware, the way Mixxx already exports to Engine DJ.
 
-The core byte-writer is built as a **standalone, Qt-free C++ library** (`libopenboxxx-export`)
-so the hard, fiddly serialization can be tested in isolation, with Mixxx integration as a thin
-adapter modeled on the existing `EnginePrimeExportJob`. A **round-trip verifier** (parse our
-own output back with Mixxx's in-tree Kaitai parsers and diff it) is a first-class feature, so a
-DJ learns whether a stick is good *before* they leave for the gig.
+Pioneer hardware now reads two different USB formats: the older **Device Library** (`export.pdb` plus
+ANLZ analysis files) and the newer, encrypted **OneLibrary** (`exportLibrary.db`). The newest players
+read only OneLibrary, older players read only Device Library, and rekordbox 7.2.11+ writes both to
+every stick. A complete solution should do the same.
 
-Scope is deliberately narrowed to the **legally clean, widest-reach** target: the classic
-unencrypted PDB/ANLZ format. The newer encrypted OneLibrary / Device Library Plus format
-(#15556) is explicitly a non-goal here for legal reasons (see Non-Goals).
+The work splits into two parts:
 
-**This is not a paper design.** The standalone writer emits a full `export.pdb` (all 20 standard
-tables + the 8-colour palette) and per-track ANLZ, every output cross-checked against two
-independent real-format parsers and diffed field-for-field against genuine rekordbox files. An
-in-Mixxx "Export Library to rekordbox USB" button already exists in a fork that compiles and links
-on macOS (Intel + Apple Silicon), Windows, and Linux via CI — downloadable builds are on the
-[Releases](https://github.com/sparkly-quasar/openboxxx/releases) page. What remains is the real
-proof: importing into rekordbox desktop and playing on physical CDJ/XDJ hardware — testers welcome.
+1. **The Mixxx-side export feature**, which doesn't depend on the backend: export dialog and job,
+   mapping Mixxx's cues, beatgrids, keys and colours to rekordbox's model (including the MP3 timing
+   correction the importer applies), and a hardware test plan. A prototype exists.
+2. **The format writer**, which produces bytes a player accepts. Three candidate backends are in
+   progress in different places (openboxxx, rekordcrate, libdjinterop). Choosing one is the first
+   decision for maintainers.
+
+There is also one policy question: whether Mixxx should ship code that uses OneLibrary's fixed SQLCipher
+passphrase. Without it, Mixxx can't reach the newest players. This document sets out the facts and
+options but doesn't try to settle that.
 
 ## Why
 
-**Motivation and context.** "Export to rekordbox USB" has been an open, confirmed wishlist item
-since 2018 (#9463), re-filed more specifically in 2021 (#10321), with no assignee, no branch, and
-no merged PR. It is one of the most-requested missing features because it removes the last reason a
-Mixxx user is forced back into rekordbox: preparing a set in open software but being unable to play
-it on the club's CDJs. Mixxx already reads rekordbox libraries; the export direction is the missing
-half.
+**Motivation and context.** "Export to rekordbox USB" has been an open, confirmed request since 2018
+(mixxxdj/mixxx#9463), re-filed more specifically in 2021 (mixxxdj/mixxx#10321), with OneLibrary
+support requested in 2025 (mixxxdj/mixxx#15556). It removes the last reason many Mixxx users keep
+rekordbox installed: preparing a set in Mixxx but being unable to play it on the club's CDJs.
 
-Much of the groundwork already exists in-tree, which makes the gap bounded rather than green-field:
+Which players read which format, according to AlphaTheta's
+[USB notice](https://alphatheta.com/en/information/important-notice-for-customers-using-usb-devices-with-our-dj-equipment/)
+and [rekordbox FAQ](https://rekordbox.com/en/support/faq/trouble-shooting-7/):
 
-* A **working Engine DJ / Engine Prime exporter** (`Library ▸ Export Library to Engine Prime`)
-  establishes the exact pattern for walking the Mixxx library and writing a foreign DJ database.
-* An **exporter-abstraction plan (#12126)** already intends to replace the Engine-specific menu item
-  with a generic `Library ▸ Export Library…` and a common per-format interface — the natural socket
-  for a rekordbox exporter.
-* **rekordbox format definitions are already in-tree**: the importer uses Kaitai-generated
-  `rekordbox_pdb` / `rekordbox_anlz` parsers (`lib/rekordbox-metadata/`, kept current by #13293), so
-  the *read* side of PDB/ANLZ is already described.
-* A **mature importer (since v2.3)** already works out the Mixxx↔rekordbox field mapping (hotcues,
-  memory cues, loops, colors, keys) in reverse; the exporter reuses that mapping the other direction.
+| Format | Players | Encryption |
+|---|---|---|
+| Device Library (`export.pdb` + `USBANLZ/` ANLZ files) | CDJ-3000, XDJ-XZ, XDJ-RX3, XDJ-RR, XDJ-1000MK2, XDJ-700, CDJ-900NXS2, CDJ-2000NXS2 and older | None |
+| OneLibrary, formerly Device Library Plus (`exportLibrary.db`) | CDJ-3000X, XDJ-AZ, OPUS-QUAD, OMNIS-DUO; the FAQ also directs CDJ-1500X and XDJ-AN users to OneLibrary | SQLCipher, fixed passphrase |
+
+Groundwork that already exists in Mixxx:
+
+* A working **Engine DJ exporter** (`Library ▸ Export Library to Engine DJ`), built on libdjinterop
+  (pinned to 0.27.1), which shows the pattern for walking the library and writing a foreign database.
+* An **exporter-abstraction plan** (mixxxdj/mixxx#12126) for a generic `Library ▸ Export Library…`
+  with a per-format interface.
+* **Read-side format definitions**: Kaitai-generated `rekordbox_pdb` / `rekordbox_anlz` parsers in
+  `lib/rekordbox-metadata/`, used by the rekordbox importer.
 
 **Pitfalls of the current solution.**
 
-* **There is no export path at all** — a Mixxx user with a CDJ has to redo their prep in rekordbox.
-* **Kaitai Struct can only READ.** Its C++ target generates parsers, not serializers, so Mixxx can
-  parse PDB/ANLZ today but has no generated code to *write* them. The single biggest chunk of
-  net-new code — a hand-written PDB/ANLZ serializer — simply does not exist yet in the project.
-* **No abstraction to plug into yet.** The exporter interface envisioned in #12126 hasn't been built,
-  so today a new exporter would have to bolt onto the Engine-specific plumbing.
+* **There is no export path.** A Mixxx user with a CDJ has to redo their preparation in rekordbox.
+* **Kaitai can't generate a C++ writer.** Kaitai 0.11 added serialization for Java and Python only;
+  the C++ target is still parse-only.
+* **Export code is tied to Engine DJ.** The whole export chain sits behind `#ifdef __ENGINEPRIME__`:
+  the menu entry, the `Library` signals, `LibraryExporter`, the QML proxy and the crate/playlist context
+  menus, and `dlglibraryexport.cpp` includes djinterop directly. A second exporter needs that gating
+  split, which overlaps with mixxxdj/mixxx#12126.
+* **The importer's mapping can't simply be reversed.** Its helpers live in an anonymous namespace in
+  `rekordboxfeature.cpp` and use Qt/Mixxx types. Keys are only read as name strings, so there is no
+  key table to invert. On import, MP3 (and M4A on CoreAudio) cue and grid positions are shifted by a
+  decoder-dependent offset (`mp3guessenc_timing_shift_case`), so an exporter must apply the inverse.
+* **The in-tree PDB parser is limited as a checker.** `rekordbox_pdb.ksy` parses row bodies for only
+  12 of the 20 table types, and still uses the `num_rows_large` heuristic that crate-digger replaced in
+  [9314a0b](https://github.com/Deep-Symmetry/crate-digger/commit/9314a0b0ac30aa2e1d3796ba72d62dc4b904a902)
+  ("Incorporate major PDB table row fix"). Re-vendoring it would help the importer as well.
 
 ## Goals
 
-* Add a **rekordbox USB exporter** that produces a stick a real CDJ/XDJ can browse and play from:
-  library, playlists, per-track beatgrids, and hot/memory cues.
-* Deliver the serializer as a **standalone, dependency-light C++ library** with its own tests, so the
-  risky byte-layout work is verifiable independently of a Mixxx build and the eventual Mixxx PR is
-  mostly adapter + dialog + CMake option.
-* Ship a **round-trip verifier** as a first-class trust feature: parse our own USB back with the
-  in-tree Kaitai parsers and report fidelity ("playlists 12/12, hotcues OK, beatgrids OK") before the
-  DJ relies on it.
-* Land as an **upstream contribution**, implementing (and helping shape) the generic exporter
-  interface of #12126 rather than a one-off menu item — and, ideally, retiring #9463 / #10321.
-* Provide an **in-app "report an export bug" flow** that opens a prefilled GitHub issue from a
-  structural diagnostic manifest (counts, sections written, verifier results, hashes — never the
-  user's audio or full metadata), so every beta tester becomes a hardware-compatibility data source.
+* Export a Mixxx library (tracks, crates and playlists, beatgrids, hot cues, memory cues and loops) to a
+  USB stick that Pioneer players can browse and play.
+* Cover both USB formats, so one stick works on older and newer players, subject to the OneLibrary
+  decision below.
+* Keep the format writer behind a backend interface, so the Mixxx-side feature doesn't depend on which
+  backend is chosen, and implement (or help shape) the exporter interface from mixxxdj/mixxx#12126.
+* Verify against real players, not just parsers: automated checks for the documented format invariants,
+  plus a published hardware compatibility matrix.
+* Make failures easy to report: an in-app "report an export problem" flow that builds a structural
+  diagnostic bundle (counts, sections written, check results, hashes; never audio or full metadata) and
+  opens a prefilled GitHub issue for the user to review.
 
-**Audience.** Mixxx users who play on Pioneer/AlphaTheta CDJ/XDJ hardware and currently keep
-rekordbox around solely to export USB sticks; Mixxx maintainers who own the library-export subsystem;
-and beta testers with access to real CDJ/XDJ units.
+**Audience.** Mixxx users who play on Pioneer/AlphaTheta hardware and keep rekordbox installed only to
+export USB sticks; Mixxx maintainers who own the library and export code; and testers with access to
+CDJ/XDJ units.
 
 ## Non-Goals
 
-* **OneLibrary / Device Library Plus (`exportLibrary.db`, #15556) is out of scope — for legal, not
-  just effort, reasons.** That database is SQLCipher-encrypted (256-bit AES); writing it means
-  circumventing an access-control measure with an extracted key, which is precisely the DMCA §1201
-  exposure the project is structured to avoid. It should be pursued **only** via an official
-  AlphaTheta spec/partnership, never with a recovered key. This proposal writes **only** the
-  unencrypted classic PDB/ANLZ format. (See openboxxx `docs/legal.md`.)
-* **Reading the encrypted rekordbox 6/7 app database (`master.db`).** The sanctioned import path is
-  the user's own `rekordbox.xml`; we never decrypt their app DB.
-* **Full analysis fidelity in the first milestone.** Waveforms (`PWAV`/`PWV3`/`PWV4`/`PWV5`), extended
-  `.EXT` cues with colors + labels (`PCO2`), `.2EX`, `PVBR`, My-Tags (`exportExt.pdb`), and history
-  playlists are deferred to a follow-up phase (they are additive ANLZ sections and don't touch the
-  PDB). The first milestone is a *playable* stick with a blank on-screen waveform, not zero playback.
-* **Bundling or shipping any AlphaTheta-extracted key or crate-digger (EPL) code.** Format knowledge
-  is taken from public specs and permissively-licensed reference implementations only (see How ▸
-  Licensing).
+* **Reading rekordbox's encrypted application database (`master.db`).** Importing stays via
+  `rekordbox.xml` and USB sticks.
+* **Settling the legal question in this document.** The OneLibrary section sets out facts and options.
+  The decision belongs to the Mixxx maintainers and, where needed, the Mixxx e.V.
+* **Waveforms, My Tags, and exporting play history in the first milestone.** These are deferred. The
+  history tables themselves must still be written in the form players expect (see Format requirements).
+* **Writing a new format library if an existing backend is chosen.** In that case the effort goes into
+  that project instead.
 
 ## How
 
-**Overview.** A standalone C++ library takes a plain intermediate model and emits bytes; Mixxx
-integration is a thin adapter that fills that model from the library.
+### The Mixxx-side export feature
 
-```text
-Mixxx library (tracks + cues + beatgrids + crates/playlists [+ waveforms, phase 2])
-        │
-        ▼   ExportModel  (plain structs — no Qt)
-  ┌──────────────────────────────────────────────────────────────────────┐
-  │  libopenboxxx-export  (standalone, Qt-free)                           │
-  │   mapping/  Mixxx-model → rekordbox-model (colors, keys, ms↔frame,…)  │
-  │   pdb/      export.pdb writer   — LITTLE-endian DeviceSQL pages       │
-  │   anlz/     ANLZ .DAT/.EXT      — BIG-endian tagged sections          │
-  │   usb/      PIONEER/ dir layout, ANLZ path assignment, audio copy     │
-  │   verify/   round-trip: parse our output w/ in-tree Kaitai + diff     │
-  │   diag/     structural diagnostic bundle (feeds in-app bug report)    │
-  └──────────────────────────────────────────────────────────────────────┘
-        │
-        ▼
-  USB stick:  /PIONEER/…  +  copied audio files
-```
+The prototype adds a `RekordboxExportJob` modelled on `EnginePrimeExportJob` (a `QThread` that loads
+tracks, crates and playlists and reports progress), plus an export dialog. Whatever backend is chosen,
+the Mixxx side needs to:
 
-The Mixxx-side adapter is a `RekordboxExportJob` that mirrors the existing `EnginePrimeExportJob`:
-a `QThread` with `loadIds/loadTrack/loadCrate/loadPlaylist` marshalling and
-`jobMaximum/jobProgress/completed/failed` signals, driving an export dialog, all behind a
-`REKORDBOX_EXPORT` CMake option. This is the concrete implementation of the exporter abstraction
-discussed in #12126, so the proposal both uses and helps define that interface. (The fork also adds
-a small "Cue Sheet to Tracklist" utility alongside it.) The fork compiles and links on macOS
-(Intel + Apple Silicon), Windows, and Linux under CI today.
+* **Split export from the Engine DJ build switch**, so rekordbox export can be built with or without
+  `ENGINEPRIME`. This is the same work mixxxdj/mixxx#12126 describes, so the two should be coordinated.
+  If libdjinterop becomes the rekordbox backend too, the two exporters share that dependency.
+* **Own a mapping layer**: Mixxx colours to rekordbox colour IDs, a new Mixxx key to rekordbox key
+  table, Mixxx's main cue to the first memory cue, hot cues and loops, the inverse of the importer's
+  MP3/M4A timing shift, and `beat_number` aligned to the downbeat rather than counted from the first
+  beat (the prototype currently does the latter).
+* **Decide how to handle HFS+ sticks.** rekordbox writes `.PIONEER/` instead of `PIONEER/` on HFS+
+  media, and Mixxx's importer checks both since mixxxdj/mixxx#16895.
 
-**Cross-platform by construction.** Byte layout is always explicit, never host-dependent: PDB integers
-written explicitly little-endian, ANLZ integers explicitly big-endian (separate helpers, never
-shared); strings encoded by hand per `device_sql_string` rules (short-ASCII mangling or `0x90`
-UTF-16**LE** for PDB, UTF-16**BE** for ANLZ paths/labels — no `std::wstring`/`wchar_t`);
-USB-internal paths always forward-slashed regardless of host OS; no FAT/exFAT-specific code (the DJ
-formats the stick). This is why macOS/Linux/Windows are all supported from day one, which also
-maximizes the beta-tester (hardware data) pool.
+### Writer backends (decision needed)
 
-**Testing and verification.** A four-tier ladder, cheapest first:
+| | openboxxx | rekordcrate via C/C++ bindings | libdjinterop |
+|---|---|---|---|
+| Language | C++, Qt-free | Rust with C/C++ bindings | C++ (could wrap rekordcrate or a C++ writer) |
+| Already a Mixxx dependency | No | No | Yes (Engine DJ export) |
+| Device Library writing | Prototype with known gaps (see below) | Holzhaus/rekordcrate#259 (export from scratch) and Holzhaus/rekordcrate#264 (ANLZ paths), both open | Proposed via rekordcrate in xsco/libdjinterop#194, with a prototype adapter |
+| OneLibrary | None | Holzhaus/rekordcrate#269 (open) | SQLCipher merged (xsco/libdjinterop#199); reading and schema in xsco/libdjinterop#196 and xsco/libdjinterop#204 (open); no writing yet |
+| Main concern | Duplicates format work happening elsewhere | Packaging a Rust dependency (raised in xsco/libdjinterop#194) | Depends on progress in two upstream projects |
 
-1. **Round-trip self-check** — write a stick, parse it back with the in-tree Kaitai parsers, confirm
-   it reproduces the intended model. Free; runs on every build in CI.
-2. **Diff vs a real rekordbox stick** — structural field comparison against a genuine
-   rekordbox-produced stick, to catch layout mistakes the parser tolerates.
-3. **Import into rekordbox desktop** — behavioral smoke test. ⚠️ *Not* equivalent to hardware (the
-   desktop app is more forgiving and may re-analyze). Standardize on **rekordbox 5** for this tier:
-   a rekordbox 7 stick writes `export.pdb` as an empty compatibility shell and puts the real library
-   in the encrypted OneLibrary DB, so rb7 is a misleading oracle for classic PDB.
-4. **Real CDJ/XDJ hardware** — the only true proof, run at milestones. Launch matrix: CDJ-2000NXS2
-   (legacy baseline), CDJ-3000/3000X (strict/modern), XDJ-AZ (modern all-in-one).
+In mixxxdj/mixxx#12873, Holzhaus suggested keeping C/C++ bindings for rekordcrate in the rekordcrate
+repository rather than adding Rust to Mixxx, while Swiftb0y was open to Rust inside Mixxx in the longer
+term. The libdjinterop route would keep a single export dependency that Mixxx already has.
 
-Tiers 1–2 are exposed as a **library API** (`verify/`) and reused by the in-app verifier so the DJ
-gets the same check. **Current status: tiers 1–2 are green** — exports complete without errors and
-round-trip through both independent parsers. **Tiers 3–4 (rekordbox-desktop import and physical
-CDJ/XDJ playback) are the outstanding proof and have not yet been run**; this is the main thing
-hardware testers can help unblock.
+Other prior art worth reviewing: [seabass](https://invent.kde.org/multimedia/seabass) (KDE, C++/Qt),
+which reads and edits existing Device Library and OneLibrary sticks; the hardware-verified Swift and
+Rust writer described in Deep-Symmetry/crate-digger#46; and AnnoyingTechnology's Rhythmbox-to-XDJ
+exporter.
 
-**Migration and downtime.** None — this is purely additive. It introduces a new
-export path (generalizing the existing Engine Prime menu item) behind a `REKORDBOX_EXPORT` CMake
-option, in the same spirit as the existing `ENGINEPRIME`/`__ENGINEPRIME__` gate. No existing data,
-schema, or user workflow changes;
-nothing is removed. Existing rekordbox *import* is untouched.
+The Mixxx-side feature works with any of these backends. The openboxxx writer is offered as one option.
+Whichever backend is chosen, its tests and the requirements list below can serve as test material.
 
-**Licensing.** The module is **GPLv2** (Mixxx-compatible). ANLZ layout is *ported* from **pyrekordbox**
-(MIT → GPLv2-compatible; attributed). PDB layout is implemented from the **crate-digger `.ksy` spec**
-(EPL-1.0) used as a *format description*, not copied code — the same clean-room-ish posture by which
-Mixxx's existing rekordbox importer was built (a file format is not itself copyrightable; a specific
-code expression is). crate-digger's EPL code is never linked. rekordcrate (MPL-2.0) is
-GPL-compatible and is discussed as an alternative below.
+### OneLibrary encryption (decision needed)
 
-**Known unknowns / open questions.**
+This section is not legal advice. It sets out what is known so maintainers can decide.
 
-* `track_row` "always X" magic constants and `bitmask` semantics — written from reference values;
-  worth confirming behaviorally on hardware.
-* All 20 standard PDB tables (including the library-independent `columns` / `unknown_17` /
-  `unknown_18` / `history` browse/sort menu tables) are now written, and output round-trips through
-  both parsers. The remaining unknown is purely behavioral: whether CDJ firmware is satisfied with the
-  exact contents — resolved only at tiers 3–4.
-* The **ANLZ-path hash quirk** (flagged by a prior community exporter): confirm whether newer firmware
-  requires a specific folder-path hash before assuming free choice of `USBANLZ` folder names.
-* PDB page conventions and `first_page`/`last_page` semantics — pass the parsers; validate on hardware.
+**Facts.**
+
+* OneLibrary's database is encrypted with SQLCipher using a fixed passphrase. It's the same on every
+  install and isn't tied to a user or licence.
+* The passphrase is already distributed in open-source code, including libdjinterop's open OneLibrary
+  pull requests (xsco/libdjinterop#196 and xsco/libdjinterop#204), which use it as the default.
+* AlphaTheta hasn't published the format. Comments in mixxxdj/mixxx#15556 report that it has been
+  shared with some other vendors and that AlphaTheta appears open to partnerships.
+* Without OneLibrary, Mixxx can't export to the CDJ-3000X, XDJ-AZ, OPUS-QUAD or OMNIS-DUO.
+
+**Considerations in favour of shipping it.**
+
+* The purpose is interoperability: writing the user's own library in the format their own hardware
+  expects. The encrypted database holds the user's own metadata, not third-party content. US law has an
+  interoperability provision in this area (17 U.S.C. §1201(f)); whether it applies is a legal question.
+* The code is already landing in libdjinterop, which Mixxx depends on.
+* rekordbox itself now writes both formats, so users will increasingly expect both.
+
+**Considerations against.**
+
+* US law also restricts distributing tools that get around encryption (§1201(a)(2)). A key being public
+  isn't by itself a defence.
+* Mixxx, or downstream packagers such as Linux distributions and app stores, could receive takedown
+  requests, and may have their own policies.
+* AlphaTheta could change the passphrase or format in a firmware or rekordbox update.
+* It could affect a future partnership with AlphaTheta.
+
+**Options.**
+
+1. **Ship OneLibrary support behind a build option**, so Mixxx and each packager can choose. The review
+   suggested asking libdjinterop for such an option.
+2. **Don't ship OneLibrary writing.** Support Device Library only, and pursue the official specification
+   with AlphaTheta.
+3. **Ship the OneLibrary code without the passphrase**, and let users supply it themselves (for example
+   in preferences). This avoids distributing the key, at some cost to usability.
+
+These aren't mutually exclusive. Asking AlphaTheta for the specification is worthwhile whatever is
+decided.
+
+### Format requirements for a stick players accept
+
+Passing a parser isn't enough: parsers are lenient, and players are strict. These are requirements
+documented by people who tested on hardware, with openboxxx's current status against each.
+
+**`export.pdb`** (sources: FORMAT.md, Deep-Symmetry/crate-digger#46, PIONEER.md):
+
+| Requirement | openboxxx today |
+|---|---|
+| Each table's `first_page` is an index page (type 0x64); CDJs ignore a table whose index page is wrong | No index pages |
+| `last_page.next_page` equals the table's `empty_candidate` | Both 0 (TODO) |
+| File header field at 0x10 is 1 or 5 in real exports (Deep-Symmetry/crate-digger#46 reports it must be 5) | 0 |
+| History tables and tables 17/18 contain the rows players expect; empty history pages make players reject the stick | 12 of 20 tables are a single empty page |
+
+**ANLZ analysis files** (sources: PIONEER.md, Holzhaus/rekordcrate#264):
+
+| Requirement | openboxxx today |
+|---|---|
+| Players compute the `P{XXX}/{XXXXXXXX}` folder from the audio file path with a published hash and ignore `analyze_path`; collisions need handling, and Mixxx's importer requires unique paths (mixxxdj/mixxx#16121) | Folder derived from the track ID |
+| `ANLZ0000.EXT` is required on XDJ-XZ, and Mixxx's importer only reads beatgrids when `.EXT` sits next to `.DAT` | `.DAT` only |
+| `.2EX` for CDJ-3000 extended data | Not written (phase 2) |
+
+### Verification
+
+1. **Automated checks.** Turn the FORMAT.md invariants into tests, and round-trip output through a
+   current parser (re-vendored `rekordbox_pdb.ksy`). openboxxx's PDB round-trip check is still a stub.
+2. **Diff against real rekordbox output.** rekordbox 7.2.11+ writes both formats, so a stick it produces
+   is a valid reference for both. (An earlier version of this document wrongly said rekordbox 7 writes
+   an empty `export.pdb`.)
+3. **Import into rekordbox.** Useful, but not a reliable stand-in for hardware either way; one
+   contributor in mixxxdj/mixxx#10321 reported rekordbox 5 flagging a stick as corrupted that an XDJ
+   played fine.
+4. **Real hardware.** Device Library: CDJ-2000NXS2, CDJ-3000, XDJ-XZ (or XDJ-1000MK2). OneLibrary:
+   CDJ-3000X, XDJ-AZ, and OPUS-QUAD or OMNIS-DUO where available.
+
+### Migration and compatibility
+
+Nothing changes for existing users or their data. The build changes, though: export code has to be
+separated from the Engine DJ switch (see above), so this is not purely additive.
+
+### Licensing
+
+* openboxxx is intended to be GPL-2.0-or-later but doesn't have a LICENSE file yet. Its ANLZ code is
+  adapted from pyrekordbox (MIT), whose notice must be kept. Both are in the action plan.
+* crate-digger is EPL-2.0 with MPL-2.0 and LGPL-3.0 as secondary licences. Mixxx already links Kaitai
+  code generated from its `.ksy` files (`lib/rekordbox-metadata/`).
+* rekordcrate is MPL-2.0 and libdjinterop is LGPL-3.0; both are compatible with Mixxx's licence.
+
+### Open questions
+
+1. Which writer backend?
+2. What is Mixxx's policy on the OneLibrary passphrase?
+3. If OneLibrary is deferred or declined, is a Device-Library-only exporter worth shipping on its own?
+   It would reach the large installed base of older players.
+4. Should rekordbox export wait for the mixxxdj/mixxx#12126 refactor, or drive it?
 
 ## Alternatives
 
-1. **Use rekordcrate (Rust) for PDB export instead of a C++ writer.** rekordcrate (Jan Holthuis) is
-   a maintainer-suggested path and already models the PDB format in Rust with serialization in view.
-   *Objection to this proposal:* "why hand-write a C++ serializer when a Rust one exists?"
-   *Counter-arguments:* (a) Mixxx is C++/CMake with no Rust in the build today, so adopting
-   rekordcrate means introducing a Rust toolchain + FFI boundary into the core build — a larger
-   architectural commitment than the exporter itself; (b) rekordcrate covers PDB but not the full
-   ANLZ writer path, USB layout, verifier, and diagnostic bundle this proposal needs, so it is a
-   partial solution regardless; (c) a Qt-free C++ library keeps the serializer inside the language
-   and build system maintainers already use. **This is genuinely an open decision for maintainers**,
-   and the standalone-library structure here is deliberately arranged so the writer could be swapped
-   for a rekordcrate-backed one without disturbing the Mixxx adapter — the adapter/dialog/CMake work
-   is reusable either way. Maintainer direction on C++-writer vs Rust-via-rekordcrate is explicitly
-   solicited.
-2. **Generate a serializer from Kaitai instead of hand-writing.** Rejected: Kaitai's C++ write
-   support is experimental/partial and not viable today; the read parsers stay Kaitai-generated, the
-   writers are hand-written.
-3. **Hard-fork Mixxx and add export out-of-tree.** Rejected as the primary path: forking splits the
-   community and forfeits Mixxx's test base, review, and credibility. Upstreaming into the existing
-   export subsystem is preferred; a fork is a fallback only if upstream cannot accept the work.
-4. **Export `rekordbox.xml` only, and let users import that into rekordbox.** Insufficient: XML round-
-   trips metadata but does not produce a USB a CDJ can play from standalone — it still requires the
-   user to open rekordbox and re-export to USB, which is the exact dependency this feature removes.
-5. **Target OneLibrary because it's the "newest, sanctioned" format.** Rejected on legal grounds — it
-   is encrypted; see Non-Goals. Counterintuitively the newest format is the one we must *not*
-   reverse-engineer key-in-hand.
+1. **Device Library only, permanently.** Simpler and avoids the encryption question, but excludes
+   current players, while rekordbox itself writes both formats.
+2. **Generate a writer with Kaitai.** Not available for C++ (see Pitfalls).
+3. **Maintain a hard fork of Mixxx.** Splits the community and loses upstream review; only a fallback.
+4. **Export `rekordbox.xml` only.** Users would still need rekordbox to put the library on a stick, which
+   is the dependency this feature is meant to remove.
+5. **Wait for an official OneLibrary specification.** Device Library export doesn't depend on it, so
+   there's no need to block that work.
 
 ## Action Plan
 
-* [x] Survey the state of the Mixxx export effort and confirm the in-tree hooks (Engine DJ exporter,
-      `lib/rekordbox-metadata/`, #12126). — openboxxx `docs/mixxx-export-status.md`,
-      `research-findings.md`
-* [x] **Phase 0 — standalone PDB/ANLZ writer + verifier, proven.** `libopenboxxx-export` emits a full
-      `export.pdb` (all 20 standard tables + 8-colour palette) and per-track ANLZ (beat grids + hot/
-      memory cues); every output is cross-checked against two independent parsers (pyrekordbox for
-      ANLZ, a crate-digger-spec Kaitai parser for PDB) and diffed field-for-field against genuine
-      rekordbox ANLZ files.
-* [x] **Phase 1 reader path.** `openboxxx_from_mixxx` reads a real `mixxxdb.sqlite` into the export
-      model with no Mixxx build required — validated on a ~2,900-track library.
-* [x] **Phase 1 in-Mixxx exporter, working in a fork.** "Export Library to rekordbox USB" button —
-      `RekordboxExportJob` + dialog mirroring the Engine DJ exporter, behind a `REKORDBOX_EXPORT`
-      CMake option (plus a "Cue Sheet to Tracklist" tool). Compiles + links on macOS (Intel + Apple
-      Silicon), Windows, and Linux via CI; downloadable builds on the
-      [Releases](https://github.com/sparkly-quasar/openboxxx/releases) page. — refs mixxxdj/mixxx#12126
-* [ ] **Verification tier 3 — rekordbox desktop import.** Confirm a generated stick imports cleanly
-      into rekordbox 5 (the classic-PDB target; not rb7, which prefers the encrypted OneLibrary DB).
-* [ ] **Verification tier 4 — real CDJ/XDJ hardware.** The true proof, on the launch matrix
-      (CDJ-2000NXS2, CDJ-3000/3000X, XDJ-AZ). Hardware testers very welcome. — refs mixxxdj/mixxx#9463,
-      mixxxdj/mixxx#10321
-* [ ] Resolve the residual behavioral unknowns at tiers 3–4 (ANLZ-path hash quirk, `track_row` magic
-      constants, exact firmware expectations for the menu tables).
-* [ ] Propose/align the shared exporter interface upstream so this lands as a contribution, not a
-      fork. — refs mixxxdj/mixxx#12126
-* [ ] Add the in-app "report an export bug" flow (structural diagnostic bundle → prefilled GitHub
-      issue; no telemetry server; user reviews before it leaves the machine).
-* [ ] Publish a hardware compatibility matrix with beta-tester results.
-* [ ] Phase 2 (follow-up, additive): waveforms and extended `.EXT`/`PCO2` cues with colors + labels,
-      `.2EX` for CDJ-3000, `PVBR`.
+Decisions:
+
+* [ ] Choose a writer backend.
+* [ ] Decide the OneLibrary passphrase policy (maintainers, and the Mixxx e.V. if needed).
+* [ ] Agree whether Device Library only is an acceptable first milestone.
+* [ ] Contact AlphaTheta about the OneLibrary specification, whatever the above decisions.
+      — refs mixxxdj/mixxx#15556
+
+Mixxx side (any backend):
+
+* [ ] Separate export code from `__ENGINEPRIME__`, coordinated with mixxxdj/mixxx#12126.
+* [ ] Mapping layer: key table, MP3/M4A timing inverse, downbeat-aligned `beat_number`.
+* [ ] Decide HFS+ `.PIONEER/` handling.
+* [ ] Re-vendor `rekordbox_pdb.ksy` from current crate-digger (also benefits the importer).
+* [ ] Run CI on the fork with pre-commit and static analysis re-enabled (currently disabled there to
+      save CI minutes).
+
+Writer:
+
+* [ ] If openboxxx: add index pages, `empty_candidate`, header field 0x10, populated history and 17/18
+      tables, the ANLZ path hash with collision handling, and `.EXT` files; replace the round-trip stub.
+* [ ] If rekordcrate or libdjinterop: contribute there (for example Holzhaus/rekordcrate#259,
+      Holzhaus/rekordcrate#264, xsco/libdjinterop#194), including bindings and packaging.
+
+Verification:
+
+* [ ] Automated invariant tests.
+* [ ] Reference sticks from rekordbox 7.2.11+.
+* [ ] Hardware matrix with tester results. — refs mixxxdj/mixxx#9463, mixxxdj/mixxx#10321
+
+Licensing:
+
+* [ ] Add a LICENSE file to openboxxx and keep pyrekordbox's MIT notice.
+
+Already done (prototype):
+
+* [x] Reader for Mixxx's `mixxxdb.sqlite` into the export model, run on a real ~2,900-track library.
+* [x] `RekordboxExportJob` and export dialog in a Mixxx fork, building desktop installers for macOS,
+      Windows and Linux.
+* [x] Prototype Device Library writer (openboxxx); not yet player-ready (see Format requirements).
