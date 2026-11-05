@@ -13,7 +13,8 @@
   * Mixxx importer: mixxxdj/mixxx#16895 (hidden `.PIONEER` directory), mixxxdj/mixxx#16121
     (unique `analyze_path`)
   * libdjinterop: xsco/libdjinterop#194 (rekordcrate integration), xsco/libdjinterop#199 (SQLCipher,
-    merged), xsco/libdjinterop#196 and xsco/libdjinterop#204 (OneLibrary reading)
+    merged), xsco/libdjinterop#196 (OneLibrary reading, merged; superseded xsco/libdjinterop#204),
+    xsco/libdjinterop#214 (creating empty OneLibrary databases, open)
   * rekordcrate: Holzhaus/rekordcrate#259 (device export from scratch), Holzhaus/rekordcrate#264
     (ANLZ path calculation), Holzhaus/rekordcrate#269 (Device Library Plus)
   * Format findings: Deep-Symmetry/crate-digger#46
@@ -73,8 +74,8 @@ The work splits into two parts:
    progress in different places (openboxxx, rekordcrate, libdjinterop). Choosing one is the first
    decision for maintainers.
 
-There is also one policy question: whether Mixxx should ship code that uses OneLibrary's fixed SQLCipher
-passphrase. Without it, Mixxx can't reach the newest players. This document sets out the facts and
+There is also one policy question: whether Mixxx should ship OneLibrary's fixed SQLCipher passphrase
+in its own code, or leave users to supply it. Without it, Mixxx can't reach the newest players. This document sets out the facts and
 options but doesn't try to settle that.
 
 ## Why
@@ -174,12 +175,15 @@ the Mixxx side needs to:
 | Language | C++, Qt-free | Rust with C/C++ bindings | C++ (could wrap rekordcrate or a C++ writer) |
 | Already a Mixxx dependency | No | No | Yes (Engine DJ export) |
 | Device Library writing | Prototype with known gaps (see below) | Holzhaus/rekordcrate#259 (export from scratch) and Holzhaus/rekordcrate#264 (ANLZ paths), both open | Proposed via rekordcrate in xsco/libdjinterop#194, with a prototype adapter |
-| OneLibrary | None | Holzhaus/rekordcrate#269 (open) | SQLCipher merged (xsco/libdjinterop#199); reading and schema in xsco/libdjinterop#196 and xsco/libdjinterop#204 (open); no writing yet |
-| Main concern | Duplicates format work happening elsewhere | Packaging a Rust dependency (raised in xsco/libdjinterop#194) | Depends on progress in two upstream projects |
+| OneLibrary | None | Holzhaus/rekordcrate#269 (open) | SQLCipher merged (xsco/libdjinterop#199); reading merged (xsco/libdjinterop#196), with the passphrase as a required argument; writing still stubbed, with creating empty databases in xsco/libdjinterop#214 (open) as the first piece |
+| Main concern | Duplicates format work happening elsewhere | Packaging a Rust dependency (raised in xsco/libdjinterop#194) | Depends on progress in two upstream projects; Mixxx is pinned to 0.27.1, and SQLCipher needs libdjinterop's shared build (see below) |
 
 In mixxxdj/mixxx#12873, Holzhaus suggested keeping C/C++ bindings for rekordcrate in the rekordcrate
 repository rather than adding Rust to Mixxx, while Swiftb0y was open to Rust inside Mixxx in the longer
-term. The libdjinterop route would keep a single export dependency that Mixxx already has.
+term. The libdjinterop route would keep a single export dependency that Mixxx already has. One packaging
+constraint: statically linking SQLCipher alongside an application's own SQLite causes symbol clashes
+("SQL logic error"). xsco/libdjinterop#196 hides SQLCipher's symbols in a shared libdjinterop build,
+so Mixxx would need to use the shared build.
 
 Other prior art worth reviewing: [seabass](https://invent.kde.org/multimedia/seabass) (KDE, C++/Qt),
 which reads and edits existing Device Library and OneLibrary sticks; the hardware-verified Swift and
@@ -197,8 +201,12 @@ This section is not legal advice. It sets out what is known so maintainers can d
 
 * OneLibrary's database is encrypted with SQLCipher using a fixed passphrase. It's the same on every
   install and isn't tied to a user or licence.
-* The passphrase is already distributed in open-source code, including libdjinterop's open OneLibrary
-  pull requests (xsco/libdjinterop#196 and xsco/libdjinterop#204), which use it as the default.
+* The passphrase circulates in public tools and write-ups, but libdjinterop doesn't ship it. A
+  libdjinterop maintainer asked for it to be removed after informal legal advice that including it
+  could mean the library "can be understood to 'break encryption'", and it was removed before
+  xsco/libdjinterop#196 merged. The merged reading code (`load_database`, `library::load`) takes the
+  passphrase as a required argument. (xsco/libdjinterop#204, which also used it as a default, was
+  closed without merging.)
 * AlphaTheta hasn't published the format. Comments in mixxxdj/mixxx#15556 report that it has been
   shared with some other vendors and that AlphaTheta appears open to partnerships.
 * Without OneLibrary, Mixxx can't export to the CDJ-3000X, XDJ-AZ, OPUS-QUAD or OMNIS-DUO.
@@ -208,7 +216,7 @@ This section is not legal advice. It sets out what is known so maintainers can d
 * The purpose is interoperability: writing the user's own library in the format their own hardware
   expects. The encrypted database holds the user's own metadata, not third-party content. US law has an
   interoperability provision in this area (17 U.S.C. §1201(f)); whether it applies is a legal question.
-* The code is already landing in libdjinterop, which Mixxx depends on.
+* OneLibrary reading code, without the key, has landed in libdjinterop, which Mixxx depends on.
 * rekordbox itself now writes both formats, so users will increasingly expect both.
 
 **Considerations against.**
@@ -222,12 +230,15 @@ This section is not legal advice. It sets out what is known so maintainers can d
 
 **Options.**
 
-1. **Ship OneLibrary support behind a build option**, so Mixxx and each packager can choose. The review
-   suggested asking libdjinterop for such an option.
-2. **Don't ship OneLibrary writing.** Support Device Library only, and pursue the official specification
+Since libdjinterop doesn't distribute the key, the choice sits entirely with Mixxx:
+
+1. **Supply the passphrase in Mixxx's own code**, optionally behind a Mixxx build option so each
+   packager can choose.
+2. **Ship the OneLibrary code without the passphrase**, and let users supply it themselves (for example
+   in preferences). This matches libdjinterop's approach and avoids distributing the key, at some cost
+   to usability.
+3. **Don't ship OneLibrary writing.** Support Device Library only, and pursue the official specification
    with AlphaTheta.
-3. **Ship the OneLibrary code without the passphrase**, and let users supply it themselves (for example
-   in preferences). This avoids distributing the key, at some cost to usability.
 
 These aren't mutually exclusive. Asking AlphaTheta for the specification is worthwhile whatever is
 decided.
