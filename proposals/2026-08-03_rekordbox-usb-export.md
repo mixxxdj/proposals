@@ -2,9 +2,10 @@
 
 * **Owners:** @sparkly-quasar
 * **Implementation Status:** Partially implemented (prototype). A standalone C++ writer (openboxxx) and
-  an in-Mixxx export button exist in a fork, but the writer is still missing structures that players
-  require (see How ▸ Format requirements), and nothing has been tested in rekordbox or on CDJ/XDJ
-  hardware yet.
+  an in-Mixxx export button exist in a fork. The writer's `export.pdb` layout now matches a real
+  rekordbox export, but it still lacks the history row, the ANLZ path hash and `.EXT` files (see How ▸
+  Format requirements). There is one hardware result so far, from a port of the writer (see
+  Verification); openboxxx's own output hasn't been tested in rekordbox or on CDJ/XDJ hardware yet.
 * **Related Issues and PRs:**
   * Feature requests: mixxxdj/mixxx#9463, mixxxdj/mixxx#10321 (Device Library export),
     mixxxdj/mixxx#15556 (OneLibrary)
@@ -46,6 +47,15 @@ This revision incorporates @markst's review. Thank you for it. The main changes:
   behaviour, and the hardware test matrix.
 * **Added the format requirements real players enforce**, with sources and openboxxx's current status
   against each.
+
+**Update, October 2026.** The first hardware result came in, from Sortero, a DJ library app whose
+Device Library writer is a port of openboxxx's. An XDJ-RX2 (firmware 1.43) mounted a stick it wrote
+but showed none of the tracks, while a plain-folder stick from the same set played. Comparing the
+stick table by table with a rekordbox export of the same kind showed the cause: the browse-menu
+tables (16, 17 and 18) were empty, so the player had no categories to browse by. Every parser check
+had passed. openboxxx now writes those tables and the rest of a real export's page layout, tested
+page by page against a real export (see Format requirements). Whether this is enough for the XDJ-RX2
+isn't confirmed yet.
 
 > **A note from the author.** I'm a long-time Mixxx user, not a professional C/C++ developer. This
 > work grew out of experimenting with AI-assisted ("vibecoding") development, and I'd like to offer it
@@ -245,17 +255,20 @@ decided.
 
 ### Format requirements for a stick players accept
 
-Passing a parser isn't enough: parsers are lenient, and players are strict. These are requirements
-documented by people who tested on hardware, with openboxxx's current status against each.
+Passing a parser isn't enough: parsers are lenient, and players are strict. The parsers used to check
+output skip the tables a player browses with, which is how an empty browse menu passed every check
+(see the update above). These are requirements documented by people who tested on hardware, with
+openboxxx's current status against each.
 
 **`export.pdb`** (sources: FORMAT.md, Deep-Symmetry/crate-digger#46, PIONEER.md):
 
 | Requirement | openboxxx today |
 |---|---|
-| Each table's `first_page` is an index page (type 0x64); CDJs ignore a table whose index page is wrong | No index pages |
-| `last_page.next_page` equals the table's `empty_candidate` | Both 0 (TODO) |
-| File header field at 0x10 is 1 or 5 in real exports (Deep-Symmetry/crate-digger#46 reports it must be 5) | 0 |
-| History tables and tables 17/18 contain the rows players expect; empty history pages make players reject the stick | 12 of 20 tables are a single empty page |
+| Each table's `first_page` is an index page (type 0x64); CDJs ignore a table whose index page is wrong | Done, as in a real export; tested against one |
+| `last_page.next_page` equals the table's `empty_candidate` | Done: every table ends on a blank spare page, which the header names |
+| File header field at 0x10 is 1 or 5 in real exports (Deep-Symmetry/crate-digger#46 reports it must be 5) | 5. An XDJ-RX2 rewrote a 0 there to 5 when it read a stick |
+| The browse-menu tables (16 `columns`, 17, 18) hold rekordbox's rows; an XDJ-RX2 showed none of a stick's tracks without them | Done, copied from a real export; a test checks the pages byte for byte |
+| History tables contain the rows players expect; empty history pages make players reject the stick | Empty tables are now an index page alone, as in a real export, but the `history` table's one row isn't written yet |
 
 **ANLZ analysis files** (sources: PIONEER.md, Holzhaus/rekordcrate#264):
 
@@ -271,12 +284,17 @@ documented by people who tested on hardware, with openboxxx's current status aga
    current parser (re-vendored `rekordbox_pdb.ksy`). openboxxx's PDB round-trip check is still a stub.
 2. **Diff against real rekordbox output.** rekordbox 7.2.11+ writes both formats, so a stick it produces
    is a valid reference for both. (An earlier version of this document wrongly said rekordbox 7 writes
-   an empty `export.pdb`.)
+   an empty `export.pdb`.) openboxxx's tests now compare its `export.pdb` pages with a real export
+   (rekordcrate's demo export, MPL-2.0). For hardware reports, the most useful evidence turned out to
+   be the stick's `PIONEER` folder after the player had read it (players write a log there) next to a
+   rekordbox export of the same tracks.
 3. **Import into rekordbox.** Useful, but not a reliable stand-in for hardware either way; one
    contributor in mixxxdj/mixxx#10321 reported rekordbox 5 flagging a stick as corrupted that an XDJ
    played fine.
 4. **Real hardware.** Device Library: CDJ-2000NXS2, CDJ-3000, XDJ-XZ (or XDJ-1000MK2). OneLibrary:
-   CDJ-3000X, XDJ-AZ, and OPUS-QUAD or OMNIS-DUO where available.
+   CDJ-3000X, XDJ-AZ, and OPUS-QUAD or OMNIS-DUO where available. Results so far: XDJ-RX2 (firmware
+   1.43), from Sortero's port of the writer, showed no tracks without the browse-menu tables; a stick
+   with them is waiting to be tried.
 
 ### Migration and compatibility
 
@@ -331,8 +349,10 @@ Mixxx side (any backend):
 
 Writer:
 
-* [ ] If openboxxx: add index pages, `empty_candidate`, header field 0x10, populated history and 17/18
-      tables, the ANLZ path hash with collision handling, and `.EXT` files; replace the round-trip stub.
+* [x] openboxxx: index pages, `empty_candidate`, header field 0x10 and the browse-menu tables (16-18),
+      tested against a real export.
+* [ ] If openboxxx: the `history` table's row, the ANLZ path hash with collision handling, and `.EXT`
+      files; replace the round-trip stub.
 * [ ] If rekordcrate or libdjinterop: contribute there (for example Holzhaus/rekordcrate#259,
       Holzhaus/rekordcrate#264, xsco/libdjinterop#194), including bindings and packaging.
 
@@ -340,7 +360,8 @@ Verification:
 
 * [ ] Automated invariant tests.
 * [ ] Reference sticks from rekordbox 7.2.11+.
-* [ ] Hardware matrix with tester results. — refs mixxxdj/mixxx#9463, mixxxdj/mixxx#10321
+* [ ] Hardware matrix with tester results (first: XDJ-RX2, via Sortero). — refs mixxxdj/mixxx#9463,
+      mixxxdj/mixxx#10321
 
 Licensing:
 
