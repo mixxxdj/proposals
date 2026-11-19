@@ -3,7 +3,7 @@
 * **Owners:**
   * `@terziev-viktor`
 
-* **Implementation Status:** `Not implemented` (a working prototype exists on a branch, see below)
+* **Implementation Status:** `Not implemented` (a working prototype exists on @terziev-viktor's fork, see the below PR)
 
 * **Related Issues and PRs:**
   * PR <https://github.com/mixxxdj/mixxx/pull/17499>
@@ -33,7 +33,7 @@ Today a DJ who wants visuals runs a separate visualizer next to Mixxx. In that s
 
 ## Goals
 
-Goals and use cases for the solution as proposed in [How](#how):
+Goals and use cases for the solution as proposed in [How](#How):
 
 * A DJ can put one window on a second screen, make it full screen and leave it alone for the whole set.
 * The window shows nothing but visuals - based on the cover art of the audible tracks, or a custom image selected by
