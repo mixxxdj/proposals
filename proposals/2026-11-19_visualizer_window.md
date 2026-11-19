@@ -71,8 +71,6 @@ flowchart LR
     C["[Visualizer] controls:<br>style, intensities"] --> V
 ```
 
-The work has four parts that can be reviewed and merged separately.
-
 ### 1. Per-deck band meter in the engine
 
 A new class `EngineBandMeter` measures how much lows, mids and highs of each deck contributes to the main mix. `EngineMixer`
@@ -108,8 +106,6 @@ opened with a new entry in the View menu.
 * Covers are scaled and blurred in a worker thread, and only while the window is shown.
 
 ### 3. Controls
-
-All controls are created at startup, independent of the skin and of the window.
 
 | Control | Purpose |
 |---------|---------|
