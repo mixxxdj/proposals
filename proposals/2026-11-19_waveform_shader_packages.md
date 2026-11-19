@@ -114,14 +114,20 @@ The prototype is 4 commits on top of `main` (about 2,900 added lines) plus 2 for
 that size is hard to review. The plan below splits it so that:
 
 * each PR has one reviewer focus (rendergraph, data, renderer, file loading, UI) and can be read in one sitting;
-* each PR builds, passes the tests and leaves Mixxx working, with stock behavior unchanged until PR 7;
-* each PR is useful or testable on its own, without dead code waiting for a later PR.
+* each PR builds, passes the tests and leaves Mixxx working, with stock behavior unchanged until PR 8;
+* from PR 3 on, each PR is used by Mixxx as soon as it is merged.
+
+PR 1 and PR 2 are the exception: they are groundwork with no caller in Mixxx until PR 3. They are split out because
+they are reviewed by different people (waveform data, rendergraph) and are easier to judge without the renderer around
+them. PR 1 is covered by its own unit tests. Both are only proposed for merging once PR 3 is open and ready for
+review, so that unused code does not sit in `main`. If reviewers prefer, PR 1 to PR 3 can instead be merged as one PR
+with three commits.
 
 | #   | PR                                                                                         | Area                       | Size (approx.)                       | Depends on   |
 | --- | ------------------------------------------------------------------------------------------ | -------------------------- | ------------------------------------ | ------------ |
 | 0   | Fix AllShader HSV hue and stem double gain                                                 | allshader                  | 2 one-liners                         | –            |
-| 1   | `WaveformPeakPyramid` + unit tests                                                         | waveform data              | ~200 + tests                         | –            |
-| 2   | Run-time fragment shaders in rendergraph + `WaveformSignalMaterial` + built-in shader      | rendergraph                | ~500 (+ generated `.gl`)             | –            |
+| 1   | `WaveformPeakPyramid` + unit tests (groundwork, first used by PR 3)                        | waveform data              | ~200 + tests                         | –            |
+| 2   | Run-time fragment shaders in rendergraph + `WaveformSignalMaterial` + built-in shader (groundwork, first used by PR 3) | rendergraph | ~500 (+ generated `.gl`) | –            |
 | 3   | `WaveformRendererSignalShader` with the built-in shader, behind a hidden config key        | allshader                  | ~550                                 | 1, 2         |
 | 4   | Shader packages: contract, `WaveformShaderLibrary`, hot reload, bundled packages, README   | allshader, res             | ~650 + ~500 shader/docs              | 3            |
 | 5   | Stems through packages (stem pass, `stems` package)                                        | allshader                  | ~300                                 | 4            |
@@ -133,11 +139,11 @@ Details:
 
 * **PR 0** is already prepared and stands alone. It also makes the stock renderers the right reference for the
   pixel comparison in later PRs.
-* **PR 1** is pure data code: the peak texture layout and its construction from a `Waveform`. It has no GL code in
-  its CPU part, so it gets unit tests (peaks per level, odd sizes, partial analysis, maximum texture size).
+* **PR 1** is pure data code: the peak texture layout and its construction from a `Waveform`. It replaces nothing
+  and nothing calls it until PR 3. It has no GL code, so it gets unit tests (peaks per level, odd sizes, partial
+  analysis, the stem pyramid, maximum texture size).
 * **PR 2** adds `MaterialShader` support for fragment source given at run time (about 50 lines) plus the waveform
-  material and its built-in shader. Its first user is PR 3. If reviewers prefer, PR 2 and PR 3 can be reviewed
-  together and merged as one.
+  material and its built-in shader. Like PR 1, nothing uses it until PR 3.
 * **PR 3** adds the renderer that draws the signal from the texture, using only the built-in Filtered shader. It is
   enabled by a hidden config key, so it ships dark. It is where the performance numbers above can be checked on
   every platform before any file loading exists.
@@ -193,8 +199,9 @@ stock renderers, and `SignalShader off` restores the old renderers.
 
 * [ ] PR 0: AllShader HSV hue and stem gain fixes
 * [ ] Agree on the open questions above, at least scene graph support and GLSL dialect
-* [ ] PR 1: `WaveformPeakPyramid` with unit tests
-* [ ] PR 2: run-time fragment shaders in rendergraph and `WaveformSignalMaterial`
+* [ ] PR 1: `WaveformPeakPyramid` with unit tests (groundwork, merged once PR 3 is ready)
+* [ ] PR 2: run-time fragment shaders in rendergraph and `WaveformSignalMaterial` (groundwork, merged once PR 3 is
+  ready)
 * [ ] PR 3: `WaveformRendererSignalShader` with the built-in shader, behind a hidden config key
 * [ ] PR 4: shader packages, library, hot reload, bundled packages and README
 * [ ] PR 5: stems through packages
