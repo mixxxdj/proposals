@@ -195,8 +195,50 @@ Details:
   Measured in the prototype: the binary shrinks by about 100 KB and memory use does not change measurably, because
   the legacy classes are never created when an AllShader type is selected. The gain is less code to maintain, fewer
   waveform types to choose from (mixxxdj/mixxx#10181, mixxxdj/mixxx#12971), and one drawing path for overviews. The
-  cost is that systems without OpenGL get an empty waveform instead of a software-drawn one. The first commit does not
+  cost for systems without working OpenGL is handled by the minimal fallback described in
+  [Low-end hardware](#low-end-hardware-raspberry-pi-and-other-arm-boards). The first commit does not
   depend on shaders, so if maintainers prefer, it can land earlier as its own PR.
+
+### Low-end hardware (Raspberry Pi and other ARM boards)
+
+Mixxx runs on Raspberry Pi 4 and 5 (Mesa V3D, OpenGL 3.1 and OpenGL ES 3.1, Wayland by default on Raspberry Pi OS)
+and on other ARM boards, often with OpenGL ES only. Earlier attempts to remove waveform types met concerns about these
+systems (mixxxdj/mixxx#3430), so this proposal treats them as a requirement, not an afterthought.
+
+What helps them:
+
+* The CPU no longer builds geometry for every pixel column of every frame. On a Pi the same CPU runs the audio, so this
+  leaves more room for low latency.
+* Packages are compiled as GLSL ES 1.00 on OpenGL ES contexts, and the peak texture is sized to the GPU's maximum
+  texture size.
+* High detail does not need desktop OpenGL with packages, so it can be offered on OpenGL ES, which
+  mixxxdj/mixxx#13385 asks for. The prototype still turns it off there to match stock; that limit can be lifted once
+  it is measured.
+
+Risks, and how the plan handles them:
+
+* **Fill rate.** All work moves to per-pixel shading. The Pi's GPU is roughly two orders of magnitude slower than the
+  Apple M1 used for the numbers above (an estimate, not a measurement), and high detail runs 2×2 supersampling.
+  High detail stays off by default on OpenGL ES, and PR 6 waits for the Raspberry Pi check below.
+* **Precision.** Positions are counted in waveform frames, up to millions, and need `highp` in the fragment shader.
+  Some ARM GPUs (for example older Mali) only have `mediump` there. When `GL_FRAGMENT_PRECISION_HIGH` is missing, PR 1
+  does not use packages and keeps the stock renderer.
+* **Texture size.** A 2048 limit (as on the Pi 3's VC4) keeps full zoom detail only up to about 37 minutes of track,
+  18 minutes with stems; 4096 covers about 2.5 hours, 75 minutes with stems. Longer tracks lose the finest zoom
+  levels and Mixxx logs it.
+* **Second GL context for overviews.** PR 4 renders overviews on their own GL thread with an offscreen surface. That is
+  untested with Mesa V3D, wayland-egl (mixxxdj/mixxx#16250) and EGLFS (mixxxdj/mixxx#15874). If it is not available,
+  overviews keep the QPainter drawing; PR 7 must keep a fallback for this case (see below).
+* **Shader compile time.** It is 4–110 ms per package on an M1, likely several times more on a Pi, and each package is
+  compiled for the scrolling waveform and for overviews. Compiles are cached per run; startup time is part of the
+  check below.
+* **No OpenGL at all.** Today the software waveforms are the escape hatch for broken drivers. PR 7 removes them, so
+  it keeps one minimal non-GL fallback (a Simple CPU waveform and overview) unless maintainers decide otherwise.
+
+**Raspberry Pi check (required before PR 6):** Pi 4 and Pi 5 on Raspberry Pi OS with Wayland, plus one X11 or EGLFS
+setup; 2 and 4 decks; with and without high detail; frames per second, dropped frames, CPU load, audio dropouts and
+startup time, against the stock renderers. Packages become the default only if they are no worse than stock there. If
+frames drop, the frame-rate step-down proposed in mixxxdj/mixxx#12971 is the next fix.
 
 ### Testing and verification
 
@@ -204,6 +246,7 @@ Details:
 * A pixel comparison of each bundled package against the stock renderer, for the scrolling waveform (PR 2, PR 3) and
   the overviews (PR 4), reported in each PR and runnable locally.
 * The performance numbers above, re-measured on Linux and Windows, in PR 1, and the overview render times in PR 4.
+* The Raspberry Pi check described above, before PR 6.
 * Manual checks: hot reload, broken packages (compile error, bad manifest, missing file) falling back to the built-in
   shader on every waveform with one log line naming the package, skin-selected packages, and stem tracks.
 
@@ -214,7 +257,8 @@ default only changes in PR 6. After PR 6, the bundled packages draw the same pic
 `SignalShader off` restores the stock AllShader renderers.
 
 PR 7 changes behavior for two groups: users whose settings select a legacy type get the AllShader type of the same
-look (an upgrade step logs it), and systems without OpenGL get no waveform. Release notes should say both.
+look (an upgrade step logs it), and systems without working OpenGL get the minimal Simple fallback instead of their
+previous software waveform type. Release notes should say both.
 
 ### Open questions
 
@@ -227,6 +271,8 @@ look (an upgrade step logs it), and systems without OpenGL get no waveform. Rele
   some drivers. Is a warning in Preferences enough, or should skin packages need an opt-in?
 * **Contract evolution.** The contract is versioned (`contract: 1`). What is the policy for adding uniforms within a
   version versus bumping it?
+* **Minimal fallback.** Should PR 7 keep a Simple CPU waveform and overview for systems without working OpenGL, or is
+  "no waveform" acceptable there (mixxxdj/mixxx#3430, mixxxdj/mixxx#11993)?
 * **Overlap with open PRs.** mixxxdj/mixxx#17502 rewrites the AllShader renderers, and several PRs add new C++ waveform
   types. Should new looks go in as packages once PR 2 lands?
 
@@ -295,6 +341,20 @@ Issues and PRs in mixxxdj/mixxx, as of 2026-11-19.
 * mixxxdj/mixxx#12449 Filtered GLSL uses the RGB color values
 * mixxxdj/mixxx#14301 Apply the visual gain setting to the overview
 
+### Raspberry Pi, OpenGL ES and low-end hardware
+
+* mixxxdj/mixxx#3430 Remove legacy Simple and HSV waveform renderers (closed, unmerged; kept for low CPU and OpenGL ES)
+* mixxxdj/mixxx#12841 Graphics performance loss with Raspberry Pi 5 and Qt 6 (closed)
+* mixxxdj/mixxx#12971 Auto pick waveform settings for older systems
+* mixxxdj/mixxx#9900 No waveform with Raspberry Pi 4
+* mixxxdj/mixxx#9696 Wishlist for embedded Mixxx
+* mixxxdj/mixxx#13381 Disable textured waveforms on OpenGL ES (merged); mixxxdj/mixxx#13385 support them on OpenGL ES
+* mixxxdj/mixxx#17280 Fix textured high detail crash and empty GLES waveforms (merged)
+* mixxxdj/mixxx#15874 Avoid crash with EGLFS (merged)
+* mixxxdj/mixxx#11993 Document which OpenGL drivers are unsupported
+* Wayland: mixxxdj/mixxx#16250 crash on wayland-egl, mixxxdj/mixxx#16013 slow resize, mixxxdj/mixxx#16014 warning for
+  OpenGL waveforms on Wayland (merged)
+
 ### Legacy waveforms (PR 7)
 
 * mixxxdj/mixxx#11838 Retire Simple GL and GLSL waveforms
@@ -310,6 +370,7 @@ Issues and PRs in mixxxdj/mixxx, as of 2026-11-19.
 * [ ] PR 3: stems through packages
 * [ ] PR 4: overviews and library column drawn with packages
 * [ ] PR 5: one user-facing switch in Preferences and skins for all waveforms
+* [ ] Raspberry Pi check (Pi 4, Pi 5; Wayland and X11/EGLFS) passes
 * [ ] PR 6: make `default` the default value of `SignalShader`
 * [ ] PR 7: remove the legacy waveform types and the QPainter overview
 
